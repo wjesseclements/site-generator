@@ -4,10 +4,15 @@ import { useState } from 'react'
 import { templates } from '@/lib/templates'
 import { TemplateModal } from '@/components/template-modal-v2'
 import { Template } from '@/lib/templates'
+import { useRouter } from 'next/navigation'
+import { DeploymentStatus } from '@/components/deployment-status'
 
 export default function Home() {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [currentDeployment, setCurrentDeployment] = useState<{ id: string; name: string } | null>(null)
+  const [showDeploymentStatus, setShowDeploymentStatus] = useState(false)
+  const router = useRouter()
 
   const handleTemplateClick = (template: Template) => {
     setSelectedTemplate(template)
@@ -15,10 +20,44 @@ export default function Home() {
   }
 
   const handleDeploy = async (values: Record<string, any>) => {
-    console.log('Deploying template:', selectedTemplate?.id, 'with values:', values)
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    setIsModalOpen(false)
-    setSelectedTemplate(null)
+    if (!selectedTemplate) return
+    
+    try {
+      // Create deployment via API
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/deployments`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          // TODO: Add authentication header
+        },
+        body: JSON.stringify({
+          templateId: selectedTemplate.id,
+          name: values.siteName || values.name || 'Untitled Deployment',
+          description: values.description,
+          parameters: values,
+          tags: {
+            Template: selectedTemplate.name,
+            Category: selectedTemplate.category
+          }
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error('Failed to create deployment')
+      }
+
+      const data = await response.json()
+      const deployment = data.deployment
+
+      // Show deployment status
+      setCurrentDeployment({ id: deployment.id, name: deployment.name })
+      setShowDeploymentStatus(true)
+      setIsModalOpen(false)
+      setSelectedTemplate(null)
+    } catch (error) {
+      console.error('Deployment failed:', error)
+      alert('Failed to create deployment. Please try again.')
+    }
   }
 
   return (
@@ -76,7 +115,9 @@ export default function Home() {
                   Site Generator Platform
                 </h1>
               </div>
-              <button style={{
+              <button 
+              onClick={() => router.push('/deployments')}
+              style={{
                 background: 'rgba(59, 130, 246, 0.1)',
                 border: '1px solid rgba(59, 130, 246, 0.3)',
                 color: '#60A5FA',
@@ -271,6 +312,109 @@ export default function Home() {
         }}
         onDeploy={handleDeploy}
       />
+
+      {/* Deployment Status Modal */}
+      {showDeploymentStatus && currentDeployment && (
+        <div style={{
+          position: 'fixed',
+          inset: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          padding: '20px',
+          zIndex: 1000
+        }}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            setShowDeploymentStatus(false)
+          }
+        }}>
+          <div style={{
+            backgroundColor: '#0f172a',
+            borderRadius: '16px',
+            padding: '30px',
+            maxWidth: '600px',
+            width: '100%',
+            maxHeight: '80vh',
+            overflow: 'auto',
+            border: '1px solid #1e293b'
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '20px'
+            }}>
+              <h2 style={{ fontSize: '1.5em', fontWeight: 'bold', margin: 0 }}>
+                Deploying: {currentDeployment.name}
+              </h2>
+              <button
+                onClick={() => setShowDeploymentStatus(false)}
+                style={{
+                  background: 'none',
+                  border: 'none',
+                  color: '#9ca3af',
+                  fontSize: '1.5em',
+                  cursor: 'pointer',
+                  padding: '0',
+                  width: '32px',
+                  height: '32px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  borderRadius: '8px',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.backgroundColor = 'rgba(255, 255, 255, 0.1)';
+                  e.currentTarget.style.color = '#fff';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.backgroundColor = 'transparent';
+                  e.currentTarget.style.color = '#9ca3af';
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <DeploymentStatus
+              deploymentId={currentDeployment.id}
+              initialStatus="PENDING"
+              websocketUrl={process.env.NEXT_PUBLIC_WEBSOCKET_URL}
+            />
+
+            <div style={{
+              marginTop: '20px',
+              display: 'flex',
+              gap: '10px',
+              justifyContent: 'flex-end'
+            }}>
+              <button
+                onClick={() => {
+                  setShowDeploymentStatus(false)
+                  router.push('/deployments')
+                }}
+                style={{
+                  padding: '10px 20px',
+                  backgroundColor: '#3b82f6',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  fontSize: '16px',
+                  cursor: 'pointer',
+                  transition: 'all 0.3s'
+                }}
+                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#3b82f6'}
+              >
+                View All Deployments
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
