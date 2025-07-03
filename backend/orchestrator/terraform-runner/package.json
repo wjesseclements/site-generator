@@ -1,0 +1,14 @@
+{
+  "name": "terraform-runner",
+  "version": "1.0.0",
+  "description": "Lambda function to execute Terraform commands",
+  "main": "index.js",
+  "dependencies": {
+    "aws-sdk": "^2.1500.0"
+  },
+  "devDependencies": {
+    "@types/aws-lambda": "^8.10.130",
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
