@@ -64,6 +64,24 @@ variable "tags" {
   default     = {}
 }
 
+variable "enable_github_actions" {
+  description = "Enable GitHub Actions OIDC provider and role"
+  type        = bool
+  default     = false
+}
+
+variable "github_repository" {
+  description = "GitHub repository in format 'owner/repo'"
+  type        = string
+  default     = "wjesseclements/site-generator"
+}
+
+variable "cross_account_external_id" {
+  description = "External ID for cross-account role assumption"
+  type        = string
+  default     = "site-generator-deployment"
+}
+
 locals {
   common_tags = merge(
     {

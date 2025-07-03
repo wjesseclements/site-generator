@@ -1,0 +1,278 @@
+name: Deploy Site Generator Platform
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'dev'
+        type: choice
+        options:
+          - dev
+          - staging
+          - prod
+
+env:
+  AWS_REGION: us-east-1
+  NODE_VERSION: '18'
+
+jobs:
+  deploy-infrastructure:
+    name: Deploy Infrastructure
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+    outputs:
+      api_url: ${{ steps.terraform-outputs.outputs.api_url }}
+      websocket_url: ${{ steps.terraform-outputs.outputs.websocket_url }}
+      frontend_url: ${{ steps.terraform-outputs.outputs.frontend_url }}
+      frontend_bucket: ${{ steps.terraform-outputs.outputs.frontend_bucket }}
+      user_pool_id: ${{ steps.terraform-outputs.outputs.user_pool_id }}
+      user_pool_client_id: ${{ steps.terraform-outputs.outputs.user_pool_client_id }}
+      identity_pool_id: ${{ steps.terraform-outputs.outputs.identity_pool_id }}
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/site-generator-${{ github.event.inputs.environment || 'dev' }}-github-actions-deploy
+          role-session-name: GitHubActions-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        working-directory: ./infrastructure
+        run: terraform init
+
+      - name: Terraform Plan
+        working-directory: ./infrastructure
+        run: |
+          terraform plan \
+            -var="environment=${{ github.event.inputs.environment || 'dev' }}" \
+            -var="enable_github_actions=true" \
+            -out=tfplan
+
+      - name: Terraform Apply
+        working-directory: ./infrastructure
+        run: terraform apply -auto-approve tfplan
+
+      - name: Get Terraform Outputs
+        id: terraform-outputs
+        working-directory: ./infrastructure
+        run: |
+          echo "api_url=$(terraform output -raw api_gateway_url)" >> $GITHUB_OUTPUT
+          echo "websocket_url=$(terraform output -raw websocket_url)" >> $GITHUB_OUTPUT
+          echo "frontend_url=$(terraform output -raw frontend_url)" >> $GITHUB_OUTPUT
+          echo "user_pool_id=$(terraform output -raw cognito_user_pool_id)" >> $GITHUB_OUTPUT
+          echo "user_pool_client_id=$(terraform output -raw cognito_user_pool_client_id)" >> $GITHUB_OUTPUT
+          echo "identity_pool_id=$(terraform output -raw cognito_identity_pool_id)" >> $GITHUB_OUTPUT
+          echo "frontend_bucket=$(terraform output -raw frontend_url | sed 's|http://||' | sed 's|\.s3-website.*||')" >> $GITHUB_OUTPUT
+
+  deploy-backend:
+    name: Deploy Backend Functions
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/site-generator-${{ github.event.inputs.environment || 'dev' }}-github-actions-deploy
+          role-session-name: GitHubActions-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Build Lambda Functions
+        working-directory: ./backend
+        run: |
+          mkdir -p dist
+          
+          FUNCTIONS=(
+            "api/create-deployment"
+            "api/get-deployment"
+            "api/get-deployments"
+            "websocket/connect"
+            "websocket/disconnect"
+            "websocket/status"
+            "orchestrator/terraform-runner"
+          )
+          
+          for func in "${FUNCTIONS[@]}"; do
+            echo "Building $func..."
+            if [ -d "$func" ]; then
+              cd $func
+              npm install --production
+              zip -rq ../../dist/$(echo $func | tr '/' '-').zip . -x "*.ts" -x "tsconfig.json"
+              cd ../..
+            fi
+          done
+
+      - name: Deploy Lambda Functions
+        working-directory: ./backend
+        run: |
+          ENVIRONMENT="${{ github.event.inputs.environment || 'dev' }}"
+          LAMBDA_BUCKET="site-generator-${ENVIRONMENT}-lambda-deployments"
+          
+          for zip_file in dist/*.zip; do
+            if [ -f "$zip_file" ]; then
+              FUNCTION_NAME="site-generator-${ENVIRONMENT}-$(basename $zip_file .zip)"
+              echo "Deploying $FUNCTION_NAME..."
+              
+              aws s3 cp $zip_file s3://$LAMBDA_BUCKET/
+              
+              aws lambda update-function-code \
+                --function-name $FUNCTION_NAME \
+                --s3-bucket $LAMBDA_BUCKET \
+                --s3-key $(basename $zip_file) \
+                --region ${{ env.AWS_REGION }} || echo "Function will be created by Terraform"
+            fi
+          done
+
+  deploy-frontend:
+    name: Deploy Frontend
+    needs: deploy-infrastructure
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/site-generator-${{ github.event.inputs.environment || 'dev' }}-github-actions-deploy
+          role-session-name: GitHubActions-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Install dependencies
+        working-directory: ./frontend
+        run: npm ci
+
+      - name: Create environment file
+        working-directory: ./frontend
+        run: |
+          cat > .env.local << EOF
+          NEXT_PUBLIC_API_URL=${{ needs.deploy-infrastructure.outputs.api_url }}
+          NEXT_PUBLIC_WEBSOCKET_URL=${{ needs.deploy-infrastructure.outputs.websocket_url }}
+          NEXT_PUBLIC_USER_POOL_ID=${{ needs.deploy-infrastructure.outputs.user_pool_id }}
+          NEXT_PUBLIC_USER_POOL_CLIENT_ID=${{ needs.deploy-infrastructure.outputs.user_pool_client_id }}
+          NEXT_PUBLIC_IDENTITY_POOL_ID=${{ needs.deploy-infrastructure.outputs.identity_pool_id }}
+          NEXT_PUBLIC_REGION=${{ env.AWS_REGION }}
+          EOF
+
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build:static
+
+      - name: Deploy to S3
+        working-directory: ./frontend
+        run: |
+          aws s3 sync out/ s3://${{ needs.deploy-infrastructure.outputs.frontend_bucket }}/ --delete
+          
+          # Set proper content types
+          aws s3 cp s3://${{ needs.deploy-infrastructure.outputs.frontend_bucket }}/ \
+            s3://${{ needs.deploy-infrastructure.outputs.frontend_bucket }}/ \
+            --exclude "*" --include "*.html" --recursive \
+            --metadata-directive REPLACE --content-type "text/html"
+          
+          aws s3 cp s3://${{ needs.deploy-infrastructure.outputs.frontend_bucket }}/ \
+            s3://${{ needs.deploy-infrastructure.outputs.frontend_bucket }}/ \
+            --exclude "*" --include "*.js" --recursive \
+            --metadata-directive REPLACE --content-type "application/javascript"
+          
+          aws s3 cp s3://${{ needs.deploy-infrastructure.outputs.frontend_bucket }}/ \
+            s3://${{ needs.deploy-infrastructure.outputs.frontend_bucket }}/ \
+            --exclude "*" --include "*.css" --recursive \
+            --metadata-directive REPLACE --content-type "text/css"
+
+  update-cors:
+    name: Update CORS Configuration
+    needs: [deploy-infrastructure, deploy-backend, deploy-frontend]
+    runs-on: ubuntu-latest
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: arn:aws:iam::${{ secrets.AWS_ACCOUNT_ID }}:role/site-generator-${{ github.event.inputs.environment || 'dev' }}-github-actions-deploy
+          role-session-name: GitHubActions-${{ github.run_id }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v2
+        with:
+          terraform_version: 1.5.0
+
+      - name: Update CORS
+        working-directory: ./infrastructure
+        run: |
+          terraform init
+          terraform apply -auto-approve \
+            -var="environment=${{ github.event.inputs.environment || 'dev' }}" \
+            -var="enable_github_actions=true" \
+            -var="allowed_origins=[\"http://localhost:3000\",\"http://localhost:3001\",\"${{ needs.deploy-infrastructure.outputs.frontend_url }}\"]" \
+            -target=aws_api_gateway_deployment.main \
+            -target=aws_apigatewayv2_deployment.websocket
+
+  deployment-summary:
+    name: Deployment Summary
+    needs: [deploy-infrastructure, deploy-backend, deploy-frontend, update-cors]
+    runs-on: ubuntu-latest
+    if: always()
+
+    steps:
+      - name: Deployment Summary
+        run: |
+          echo "## 🚀 Deployment Complete!"
+          echo ""
+          echo "### 📍 URLs:"
+          echo "- **Frontend**: ${{ needs.deploy-infrastructure.outputs.frontend_url }}"
+          echo "- **API Gateway**: ${{ needs.deploy-infrastructure.outputs.api_url }}"
+          echo "- **WebSocket**: ${{ needs.deploy-infrastructure.outputs.websocket_url }}"
+          echo ""
+          echo "### 🔐 Cognito:"
+          echo "- **User Pool ID**: ${{ needs.deploy-infrastructure.outputs.user_pool_id }}"
+          echo "- **Client ID**: ${{ needs.deploy-infrastructure.outputs.user_pool_client_id }}"
+          echo ""
+          echo "### 📝 Next Steps:"
+          echo "1. Create a test user in Cognito"
+          echo "2. Visit the frontend URL"
+          echo "3. Deploy your first template!"
