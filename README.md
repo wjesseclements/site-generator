@@ -10,6 +10,7 @@ A self-service infrastructure provisioning platform that allows users to select 
 - 📊 Real-time deployment status updates
 - 🌐 Multi-account AWS deployment support
 - 🎨 Modern, responsive UI built with Next.js
+- 🔄 Automated CI/CD pipeline with GitHub Actions
 
 ## Available Templates
 
