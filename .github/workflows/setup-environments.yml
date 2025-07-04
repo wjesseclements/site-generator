@@ -1,0 +1,169 @@
+name: Setup GitHub Environments
+
+on:
+  workflow_dispatch:
+    inputs:
+      setup_type:
+        description: 'Type of setup to perform'
+        required: true
+        default: 'environments'
+        type: choice
+        options:
+        - environments
+        - branch-protection
+        - secrets
+
+jobs:
+  setup-environments:
+    name: Setup GitHub Environments
+    runs-on: ubuntu-latest
+    if: github.event.inputs.setup_type == 'environments'
+    steps:
+      - name: Setup Development Environment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              await github.rest.repos.createOrUpdateEnvironment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                environment_name: 'development',
+                wait_timer: 0,
+                deployment_branch_policy: {
+                  protected_branches: false,
+                  custom_branch_policies: true
+                }
+              });
+              
+              console.log('✅ Development environment created');
+              
+              // Add custom branch policy for dev branch
+              await github.rest.repos.createDeploymentBranchPolicy({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                environment_name: 'development',
+                name: 'dev',
+                type: 'branch'
+              });
+              
+              console.log('✅ Development branch policy added');
+            } catch (error) {
+              console.log('Development environment may already exist:', error.message);
+            }
+
+      - name: Setup Staging Environment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              await github.rest.repos.createOrUpdateEnvironment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                environment_name: 'staging',
+                wait_timer: 300000, // 5 minutes wait time
+                deployment_branch_policy: {
+                  protected_branches: true,
+                  custom_branch_policies: false
+                }
+              });
+              
+              console.log('✅ Staging environment created with 5 minute wait timer');
+            } catch (error) {
+              console.log('Staging environment may already exist:', error.message);
+            }
+
+      - name: Setup Production Environment
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              await github.rest.repos.createOrUpdateEnvironment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                environment_name: 'production',
+                wait_timer: 1800000, // 30 minutes wait time
+                deployment_branch_policy: {
+                  protected_branches: true,
+                  custom_branch_policies: false
+                }
+              });
+              
+              console.log('✅ Production environment created with 30 minute wait timer');
+            } catch (error) {
+              console.log('Production environment may already exist:', error.message);
+            }
+
+  setup-branch-protection:
+    name: Setup Branch Protection
+    runs-on: ubuntu-latest
+    if: github.event.inputs.setup_type == 'branch-protection'
+    steps:
+      - name: Protect main branch
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            try {
+              await github.rest.repos.updateBranchProtection({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                branch: 'main',
+                required_status_checks: {
+                  strict: true,
+                  contexts: [
+                    'Frontend Tests',
+                    'Backend Tests', 
+                    'Terraform Validation',
+                    'Security Scan'
+                  ]
+                },
+                enforce_admins: true,
+                required_pull_request_reviews: {
+                  required_approving_review_count: 1,
+                  dismiss_stale_reviews: true,
+                  require_code_owner_reviews: false
+                },
+                restrictions: null,
+                allow_force_pushes: false,
+                allow_deletions: false
+              });
+              
+              console.log('✅ Main branch protection enabled');
+            } catch (error) {
+              console.log('Error setting up branch protection:', error.message);
+            }
+
+  setup-secrets-info:
+    name: Required Secrets Information
+    runs-on: ubuntu-latest
+    if: github.event.inputs.setup_type == 'secrets'
+    steps:
+      - name: Display required secrets
+        run: |
+          echo "## 🔐 Required Repository Secrets"
+          echo ""
+          echo "Please add the following secrets to your repository:"
+          echo ""
+          echo "### AWS Credentials (for all environments)"
+          echo "- \`AWS_ACCESS_KEY_ID\` - AWS access key for deployment"
+          echo "- \`AWS_SECRET_ACCESS_KEY\` - AWS secret key for deployment"
+          echo "- \`AWS_ACCOUNT_ID\` - Your AWS account ID"
+          echo ""
+          echo "### Optional Secrets"
+          echo "- \`SLACK_WEBHOOK_URL\` - For deployment notifications"
+          echo "- \`DATADOG_API_KEY\` - For monitoring integration"
+          echo ""
+          echo "### How to add secrets:"
+          echo "1. Go to your repository Settings"
+          echo "2. Click on 'Secrets and variables' > 'Actions'"
+          echo "3. Click 'New repository secret'"
+          echo "4. Add each secret with the exact name shown above"
+          echo ""
+          echo "### Environment-specific secrets (optional):"
+          echo "You can also add secrets to specific environments:"
+          echo "- Go to Settings > Environments"
+          echo "- Select an environment (development, staging, production)"
+          echo "- Add environment-specific secrets"
