@@ -16,8 +16,6 @@ on:
 permissions:
   contents: write
   actions: write
-  repository-projects: write
-  environments: write
 
 jobs:
   setup-environments:
@@ -28,7 +26,7 @@ jobs:
       - name: Setup Development Environment
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             try {
               await github.rest.repos.createOrUpdateEnvironment({
@@ -61,7 +59,7 @@ jobs:
       - name: Setup Staging Environment
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             try {
               await github.rest.repos.createOrUpdateEnvironment({
@@ -83,7 +81,7 @@ jobs:
       - name: Setup Production Environment
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             try {
               await github.rest.repos.createOrUpdateEnvironment({
@@ -110,7 +108,7 @@ jobs:
       - name: Protect main branch
         uses: actions/github-script@v7
         with:
-          github-token: ${{ secrets.GITHUB_TOKEN }}
+          github-token: ${{ secrets.PAT_TOKEN || secrets.GITHUB_TOKEN }}
           script: |
             try {
               await github.rest.repos.updateBranchProtection({
