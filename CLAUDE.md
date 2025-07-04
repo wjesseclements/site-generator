@@ -112,6 +112,24 @@ Copy `infrastructure/terraform.tfvars.example` to `terraform.tfvars` and configu
 3. **Infrastructure Changes**: Modify Terraform in `/infrastructure`, run plan before apply
 4. **Template Changes**: Add new templates in `/templates` as Terraform modules
 
+## Major Features
+
+### Core Platform Features
+- **[Template Gallery](TEMPLATE_GALLERY.md)** - Interactive template selection with 4 pre-built website templates
+- **[User Authentication](USER_AUTHENTICATION.md)** - AWS Cognito-based authentication with JWT authorization
+- **[Deployment Orchestration](DEPLOYMENT_ORCHESTRATION.md)** - Step Functions workflow for automated Terraform execution
+- **[Real-Time Status Updates](REALTIME_STATUS_UPDATES.md)** - WebSocket-based live deployment progress tracking
+- **[Deployment Monitoring](DEPLOYMENT_MONITORING.md)** - Comprehensive dashboard for deployment history and status
+- **[Template Management](TEMPLATE_MANAGEMENT.md)** - Terraform-based template system with dynamic parameter injection
+
+### Infrastructure Features
+- **[Infrastructure Provisioning](INFRASTRUCTURE_PROVISIONING.md)** - Complete AWS infrastructure automation via Terraform
+- **[Lambda Architecture](LAMBDA_ARCHITECTURE.md)** - Serverless compute for all backend operations
+- **[Database Operations](DATABASE_OPERATIONS.md)** - DynamoDB-based data persistence and WebSocket connection management
+- **[S3 Hosting](S3_HOSTING.md)** - Static website hosting and artifact storage
+- **[API Gateway Integration](API_GATEWAY_INTEGRATION.md)** - RESTful API and WebSocket communication endpoints
+- **[WebSocket Communication](WEBSOCKET_COMMUNICATION.md)** - Real-time bidirectional communication system
+
 ## Important Notes
 
 - No test suite currently implemented
