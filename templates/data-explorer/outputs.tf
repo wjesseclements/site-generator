@@ -28,7 +28,7 @@ output "deployment_info" {
   value = {
     deployment_id   = var.deployment_id
     deployment_name = var.deployment_name
-    site_name      = var.site_name
-    environment    = var.environment
+    site_name       = var.site_name
+    environment     = var.environment
   }
 }

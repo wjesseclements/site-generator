@@ -62,10 +62,10 @@ resource "aws_s3_bucket_policy" "data_explorer_site" {
 
 # DynamoDB table for data storage
 resource "aws_dynamodb_table" "data_explorer_table" {
-  name           = "${var.site_name}-data-explorer-${var.deployment_id}"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "id"
-  range_key      = var.enable_timestamp_sorting ? "timestamp" : null
+  name         = "${var.site_name}-data-explorer-${var.deployment_id}"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "id"
+  range_key    = var.enable_timestamp_sorting ? "timestamp" : null
 
   attribute {
     name = "id"
@@ -107,16 +107,16 @@ resource "aws_dynamodb_table" "data_explorer_table" {
 resource "aws_lambda_function" "data_explorer_api" {
   filename         = data.archive_file.lambda_zip.output_path
   function_name    = "${var.site_name}-data-explorer-api-${var.deployment_id}"
-  role            = aws_iam_role.lambda_execution.arn
-  handler         = "index.handler"
+  role             = aws_iam_role.lambda_execution.arn
+  handler          = "index.handler"
   source_code_hash = data.archive_file.lambda_zip.output_base64sha256
-  runtime         = "nodejs18.x"
-  memory_size     = 512
-  timeout         = 30
+  runtime          = "nodejs18.x"
+  memory_size      = 512
+  timeout          = 30
 
   environment {
     variables = {
-      TABLE_NAME = aws_dynamodb_table.data_explorer_table.name
+      TABLE_NAME  = aws_dynamodb_table.data_explorer_table.name
       CORS_ORIGIN = "https://${aws_s3_bucket_website_configuration.data_explorer_site.website_endpoint}"
     }
   }
@@ -305,7 +305,7 @@ resource "aws_cloudwatch_log_group" "lambda_logs" {
 data "archive_file" "lambda_zip" {
   type        = "zip"
   output_path = "${path.module}/lambda.zip"
-  
+
   source {
     content  = file("${path.module}/lambda/index.js")
     filename = "index.js"
