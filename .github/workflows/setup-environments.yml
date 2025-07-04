@@ -13,6 +13,12 @@ on:
         - branch-protection
         - secrets
 
+permissions:
+  contents: read
+  actions: read
+  administration: write
+  repository-projects: write
+
 jobs:
   setup-environments:
     name: Setup GitHub Environments
