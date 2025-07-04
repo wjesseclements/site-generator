@@ -1,10 +1,5 @@
 // Global type declarations for modules without TypeScript support
 
-declare module 'framer-motion' {
-  export const motion: any;
-  export const AnimatePresence: any;
-}
-
 declare module 'lucide-react' {
   export const ChevronDown: any;
   export const Globe: any;
