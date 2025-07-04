@@ -1,60 +1,3 @@
-variable "function_name" {
-  description = "Name of the Lambda function"
-  type        = string
-}
-
-variable "handler" {
-  description = "Lambda function handler"
-  type        = string
-  default     = "index.handler"
-}
-
-variable "runtime" {
-  description = "Lambda runtime"
-  type        = string
-  default     = "nodejs18.x"
-}
-
-variable "memory_size" {
-  description = "Lambda memory size in MB"
-  type        = number
-  default     = 512
-}
-
-variable "timeout" {
-  description = "Lambda timeout in seconds"
-  type        = number
-  default     = 300
-}
-
-variable "source_path" {
-  description = "Path to Lambda source code"
-  type        = string
-}
-
-variable "role_arn" {
-  description = "IAM role ARN for Lambda execution"
-  type        = string
-}
-
-variable "environment_variables" {
-  description = "Environment variables for Lambda"
-  type        = map(string)
-  default     = {}
-}
-
-variable "tags" {
-  description = "Tags to apply to Lambda function"
-  type        = map(string)
-  default     = {}
-}
-
-variable "reserved_concurrent_executions" {
-  description = "Reserved concurrent executions"
-  type        = number
-  default     = -1
-}
-
 # Create a zip file from the source code
 data "archive_file" "lambda_zip" {
   type        = "zip"
@@ -91,15 +34,3 @@ resource "aws_cloudwatch_log_group" "lambda" {
   tags = var.tags
 }
 
-# Outputs
-output "function_name" {
-  value = aws_lambda_function.this.function_name
-}
-
-output "function_arn" {
-  value = aws_lambda_function.this.arn
-}
-
-output "invoke_arn" {
-  value = aws_lambda_function.this.invoke_arn
-}

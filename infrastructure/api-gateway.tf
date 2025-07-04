@@ -55,10 +55,10 @@ resource "aws_api_gateway_method_response" "deployments_options" {
   http_method = aws_api_gateway_method.deployments_options.http_method
   status_code = "200"
 
-  response_headers = {
-    "Access-Control-Allow-Headers" = true
-    "Access-Control-Allow-Methods" = true
-    "Access-Control-Allow-Origin"  = true
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
   }
 
   response_models = {
@@ -72,10 +72,10 @@ resource "aws_api_gateway_integration_response" "deployments_options" {
   http_method = aws_api_gateway_method.deployments_options.http_method
   status_code = aws_api_gateway_method_response.deployments_options.status_code
 
-  response_headers = {
-    "Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
-    "Access-Control-Allow-Methods" = "'GET,OPTIONS,POST'"
-    "Access-Control-Allow-Origin"  = "'*'"
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Methods" = "'GET,OPTIONS,POST'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
 }
 
@@ -309,7 +309,7 @@ resource "aws_apigatewayv2_stage" "websocket" {
   name          = var.environment
 
   default_route_settings {
-    throttle_rate_limit  = 100
-    throttle_burst_limit = 200
+    throttling_rate_limit  = 100
+    throttling_burst_limit = 200
   }
 }
