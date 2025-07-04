@@ -14,10 +14,10 @@ on:
         - secrets
 
 permissions:
-  contents: read
-  actions: read
-  administration: write
+  contents: write
+  actions: write
   repository-projects: write
+  environments: write
 
 jobs:
   setup-environments:
