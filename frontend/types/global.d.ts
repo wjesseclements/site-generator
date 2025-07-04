@@ -17,16 +17,26 @@ declare module 'lucide-react' {
   export const CheckCircle: any;
   export const XCircle: any;
   export const Loader: any;
+  export const Loader2: any;
   export const Play: any;
   export const Pause: any;
   export const RotateCcw: any;
   export const ExternalLink: any;
+  export const ArrowRight: any;
+  export const X: any;
 }
 
 declare module 'tailwind-merge' {
-  export function cn(...classes: (string | undefined | null | false)[]): string;
+  export function twMerge(...classes: (string | undefined | null | false)[]): string;
+  export default function cn(...classes: (string | undefined | null | false)[]): string;
 }
 
 declare module 'clsx' {
-  export default function clsx(...args: any[]): string;
+  export type ClassValue = string | number | boolean | undefined | null | ClassArray | ClassDictionary;
+  export interface ClassDictionary {
+    [id: string]: any;
+  }
+  export interface ClassArray extends Array<ClassValue> {}
+  export default function clsx(...args: ClassValue[]): string;
+  export function clsx(...args: ClassValue[]): string;
 }
