@@ -66,19 +66,19 @@ module "terraform_runner_lambda" {
   function_name = "${local.resource_prefix}-terraform-runner"
   handler       = "index.handler"
   runtime       = "nodejs18.x"
-  memory_size   = 3008  # Maximum memory for better performance
-  timeout       = 900   # 15 minutes maximum
+  memory_size   = 3008 # Maximum memory for better performance
+  timeout       = 900  # 15 minutes maximum
   source_path   = "../backend/orchestrator/terraform-runner"
   role_arn      = aws_iam_role.terraform_runner_execution.arn
 
   environment_variables = {
-    DEPLOYMENTS_TABLE      = aws_dynamodb_table.deployments.name
-    CONNECTIONS_TABLE      = aws_dynamodb_table.connections.name
-    TERRAFORM_BUCKET       = aws_s3_bucket.terraform_states.id
-    TERRAFORM_LOCKS_TABLE  = aws_dynamodb_table.terraform_locks.name
-    WEBSOCKET_ENDPOINT     = "${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}"
+    DEPLOYMENTS_TABLE         = aws_dynamodb_table.deployments.name
+    CONNECTIONS_TABLE         = aws_dynamodb_table.connections.name
+    TERRAFORM_BUCKET          = aws_s3_bucket.terraform_states.id
+    TERRAFORM_LOCKS_TABLE     = aws_dynamodb_table.terraform_locks.name
+    WEBSOCKET_ENDPOINT        = "${aws_apigatewayv2_api.websocket.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}"
     CROSS_ACCOUNT_ROLE_PREFIX = "arn:aws:iam::"
-    ENVIRONMENT           = var.environment
+    ENVIRONMENT               = var.environment
   }
 
   tags = local.common_tags

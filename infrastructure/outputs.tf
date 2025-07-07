@@ -60,7 +60,7 @@ output "step_functions_arn" {
 
 output "deployment_instructions" {
   description = "Instructions for deploying the frontend"
-  value = <<-EOT
+  value       = <<-EOT
     To deploy the frontend:
     1. Build the Next.js app: cd ../frontend && npm run build
     2. Upload to S3: aws s3 sync out/ s3://${aws_s3_bucket.frontend.id}/ --delete
