@@ -13,6 +13,9 @@ export default function Home() {
   const [currentDeployment, setCurrentDeployment] = useState<{ id: string; name: string } | null>(null)
   const [showDeploymentStatus, setShowDeploymentStatus] = useState(false)
   const router = useRouter()
+  
+  // Deployment indicator
+  const buildTime = new Date().toISOString()
 
   const handleTemplateClick = (template: Template) => {
     setSelectedTemplate(template)
