@@ -177,7 +177,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     checkAuthState()
 
     // Listen to auth events
-    const unsubscribe = Hub.listen('auth', ({ payload }) => {
+    const unsubscribe = Hub.listen('auth', ({ payload }: { payload: any }) => {
       switch (payload.event) {
         case 'signedIn':
           checkAuthState()
