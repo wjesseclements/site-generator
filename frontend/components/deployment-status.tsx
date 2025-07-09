@@ -29,8 +29,8 @@ export function DeploymentStatus({ deploymentId, initialStatus = 'PENDING', webs
           setStatus(update.status);
           setStatusMessage(update.message);
           
-          if (update.output) {
-            setLogs(prev => [...prev, update.output!]);
+          if (update.outputs) {
+            setLogs(prev => [...prev, JSON.stringify(update.outputs)]);
           }
           
           if (update.error) {

@@ -317,7 +317,10 @@ export default function Home() {
                   position: 'relative',
                   overflow: 'hidden',
                   backdropFilter: 'blur(10px)',
-                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)'
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)',
+                  minHeight: '400px',
+                  display: 'flex',
+                  flexDirection: 'column'
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.boxShadow = '0 25px 50px -12px rgba(59, 130, 246, 0.25)';
@@ -331,7 +334,7 @@ export default function Home() {
                 }}
               >
 
-                <div style={{ position: 'relative', zIndex: 1 }}>
+                <div style={{ position: 'relative', zIndex: 1, flex: 1, display: 'flex', flexDirection: 'column' }}>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', marginBottom: '1rem' }}>
                     <div style={{
                       width: '48px',
@@ -363,11 +366,66 @@ export default function Home() {
                     </div>
                   </div>
                   
-                  <p style={{ color: '#9CA3AF', fontSize: '0.875rem', marginBottom: '1.5rem' }}>
+                  <p style={{ color: '#9CA3AF', fontSize: '0.875rem', marginBottom: '1rem', lineHeight: '1.5' }}>
                     {template.description}
                   </p>
                   
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem' }}>
+                  {/* Key Features Preview */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <h4 style={{ fontSize: '0.75rem', fontWeight: '600', color: '#D1D5DB', marginBottom: '0.5rem' }}>
+                      Key Features
+                    </h4>
+                    <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                      {template.features.slice(0, 3).map((feature, idx) => (
+                        <li key={idx} style={{
+                          fontSize: '0.75rem',
+                          color: '#9CA3AF',
+                          marginBottom: '0.25rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: '0.5rem'
+                        }}>
+                          <span style={{
+                            width: '3px',
+                            height: '3px',
+                            backgroundColor: '#60A5FA',
+                            borderRadius: '50%',
+                            flexShrink: 0
+                          }} />
+                          {feature}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                  
+                  {/* Tech Stack Preview */}
+                  <div style={{ marginBottom: '1.5rem' }}>
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem' }}>
+                      {template.techStack.slice(0, 3).map((tech, idx) => (
+                        <span key={idx} style={{
+                          fontSize: '0.625rem',
+                          color: '#9CA3AF',
+                          background: 'rgba(55, 65, 81, 0.3)',
+                          padding: '0.125rem 0.375rem',
+                          borderRadius: '3px',
+                          border: '1px solid rgba(75, 85, 99, 0.2)'
+                        }}>
+                          {tech}
+                        </span>
+                      ))}
+                      {template.techStack.length > 3 && (
+                        <span style={{
+                          fontSize: '0.625rem',
+                          color: '#6B7280',
+                          padding: '0.125rem 0.375rem'
+                        }}>
+                          +{template.techStack.length - 3} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.75rem', marginTop: 'auto' }}>
                     <span style={{ color: '#6B7280' }}>
                       <span style={{
                         display: 'inline-block',

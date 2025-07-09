@@ -6,6 +6,13 @@ export interface Template {
   category: string
   estimatedCost: string
   parameters: TemplateParameter[]
+  features: string[]
+  techStack: string[]
+  preview?: {
+    image: string
+    alt: string
+  }
+  useCases: string[]
 }
 
 export interface TemplateParameter {
@@ -23,10 +30,25 @@ export const templates: Template[] = [
   {
     id: 'data-explorer',
     name: 'Data Explorer',
-    description: 'Interactive database dashboard with query interface',
+    description: 'Interactive database dashboard with query interface for data analysis and visualization',
     icon: '📊',
     category: 'Analytics',
     estimatedCost: '$0.12/hour',
+    features: [
+      'Interactive SQL query builder',
+      'Real-time data visualization',
+      'Export to CSV/Excel',
+      'User access controls',
+      'Scheduled reports',
+      'Custom dashboard creation'
+    ],
+    techStack: ['React', 'Node.js', 'PostgreSQL/MySQL', 'Chart.js', 'AWS RDS'],
+    useCases: [
+      'Business intelligence dashboards',
+      'Data analysis for teams',
+      'Customer data exploration',
+      'Sales and marketing analytics'
+    ],
     parameters: [
       {
         name: 'siteName',
@@ -65,10 +87,25 @@ export const templates: Template[] = [
   {
     id: 'company-pulse',
     name: 'Company Pulse',
-    description: 'Corporate announcement and blog platform',
+    description: 'Corporate announcement and blog platform for internal communications',
     icon: '📢',
     category: 'Communication',
     estimatedCost: '$0.08/hour',
+    features: [
+      'Rich text editor for announcements',
+      'Employee commenting system',
+      'Email notifications',
+      'Content scheduling',
+      'Analytics dashboard',
+      'Mobile-responsive design'
+    ],
+    techStack: ['Next.js', 'React', 'AWS Lambda', 'DynamoDB', 'SES'],
+    useCases: [
+      'Company-wide announcements',
+      'Department updates',
+      'Policy changes',
+      'Employee engagement'
+    ],
     parameters: [
       {
         name: 'siteName',
@@ -99,10 +136,25 @@ export const templates: Template[] = [
   {
     id: 'pixelworks',
     name: 'PixelWorks',
-    description: 'Image transformation and analysis studio',
+    description: 'Image transformation and analysis studio with AI-powered features',
     icon: '🎨',
     category: 'Media',
     estimatedCost: '$0.15/hour',
+    features: [
+      'Batch image processing',
+      'AI-powered image analysis',
+      'Format conversion',
+      'Resize and optimization',
+      'Metadata extraction',
+      'Cloud storage integration'
+    ],
+    techStack: ['React', 'Node.js', 'AWS Rekognition', 'S3', 'Lambda'],
+    useCases: [
+      'Marketing asset processing',
+      'Product image optimization',
+      'Content moderation',
+      'Image analysis workflows'
+    ],
     parameters: [
       {
         name: 'siteName',
@@ -133,10 +185,25 @@ export const templates: Template[] = [
   {
     id: 'team-polls',
     name: 'Team Polls',
-    description: 'Real-time polls and surveys platform',
-    icon: '📊',
+    description: 'Real-time polls and surveys platform for team engagement and feedback',
+    icon: '🗳️',
     category: 'Engagement',
     estimatedCost: '$0.10/hour',
+    features: [
+      'Real-time voting results',
+      'Anonymous voting options',
+      'Multiple poll types',
+      'Results analytics',
+      'Export capabilities',
+      'Team management'
+    ],
+    techStack: ['React', 'Node.js', 'WebSocket', 'DynamoDB', 'Lambda'],
+    useCases: [
+      'Team decision making',
+      'Employee feedback collection',
+      'Meeting polls',
+      'Engagement surveys'
+    ],
     parameters: [
       {
         name: 'siteName',
