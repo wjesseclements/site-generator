@@ -28,6 +28,10 @@ jobs:
           # Install dependencies with verification
           npm install
           echo "Verifying aws-amplify installation..."
+          if [ ! -d "node_modules/aws-amplify/" ]; then
+            echo "aws-amplify not found, installing explicitly..."
+            npm install aws-amplify@6.15.3
+          fi
           ls -la node_modules/aws-amplify/
           echo "Testing aws-amplify module resolution..."
           node -e "console.log('AWS Amplify version:', require('aws-amplify/package.json').version)"
