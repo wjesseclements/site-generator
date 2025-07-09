@@ -1,7 +1,6 @@
 'use client'
 
 import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react'
-import { Hub } from 'aws-amplify/utils'
 import { AuthService, type User, type AuthState } from '@/lib/auth'
 
 interface AuthContextType extends AuthState {
@@ -176,35 +175,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
   useEffect(() => {
     checkAuthState()
 
-    // Listen to auth events
-    const unsubscribe = Hub.listen('auth', ({ payload }: { payload: any }) => {
-      switch (payload.event) {
-        case 'signedIn':
-          checkAuthState()
-          break
-        case 'signedOut':
-          updateAuthState({
-            isAuthenticated: false,
-            user: null,
-            isLoading: false
-          })
-          break
-        case 'tokenRefresh':
-          checkAuthState()
-          break
-        case 'tokenRefresh_failure':
-          updateAuthState({
-            isAuthenticated: false,
-            user: null,
-            error: 'Session expired. Please sign in again.'
-          })
-          break
-        default:
-          break
-      }
-    })
-
-    return unsubscribe
+    // TODO: Add auth event listeners when Hub import issue is resolved
+    // For now, we'll rely on manual state checks
   }, [])
 
   const contextValue: AuthContextType = {
