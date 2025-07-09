@@ -123,7 +123,13 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
           "iam:CreatePolicy",
           "iam:DeletePolicy",
           "iam:GetPolicy",
-          "iam:ListPolicies"
+          "iam:ListPolicies",
+          "iam:TagRole",
+          "iam:UntagRole",
+          "iam:ListRoleTags",
+          "iam:CreateOpenIDConnectProvider",
+          "iam:DeleteOpenIDConnectProvider",
+          "iam:GetOpenIDConnectProvider"
         ]
         Resource = "*"
       },
@@ -148,7 +154,10 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
           "dynamodb:GetItem",
           "dynamodb:DeleteItem",
           "dynamodb:Query",
-          "dynamodb:Scan"
+          "dynamodb:Scan",
+          "dynamodb:TagResource",
+          "dynamodb:UntagResource",
+          "dynamodb:ListTagsOfResource"
         ]
         Resource = "*"
       },
