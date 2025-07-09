@@ -56,7 +56,10 @@ jobs:
 
       - name: Terraform Init
         working-directory: ./infrastructure
-        run: terraform init
+        run: |
+          # Use separate state key for GitHub Actions deployments
+          terraform init \
+            -backend-config="key=environments/${{ github.event.inputs.environment || 'dev' }}/terraform.tfstate"
 
       - name: Terraform Plan
         working-directory: ./infrastructure
@@ -244,7 +247,8 @@ jobs:
       - name: Update CORS
         working-directory: ./infrastructure
         run: |
-          terraform init
+          terraform init \
+            -backend-config="key=environments/${{ github.event.inputs.environment || 'dev' }}/terraform.tfstate"
           terraform apply -auto-approve \
             -var="environment=${{ github.event.inputs.environment || 'dev' }}" \
             -var="enable_github_actions=true" \
