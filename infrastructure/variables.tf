@@ -82,6 +82,32 @@ variable "cross_account_external_id" {
   default     = "site-generator-deployment"
 }
 
+variable "github_token" {
+  description = "GitHub personal access token for repository dispatch"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "github_repo_owner" {
+  description = "GitHub repository owner/organization"
+  type        = string
+  default     = "wjesseclements"
+}
+
+variable "github_repo_name" {
+  description = "GitHub repository name for infrastructure templates"
+  type        = string
+  default     = "site-generator-infrastructure"
+}
+
+variable "github_webhook_secret" {
+  description = "Secret for GitHub webhook verification"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 locals {
   common_tags = merge(
     {
