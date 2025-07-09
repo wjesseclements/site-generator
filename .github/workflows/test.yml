@@ -27,6 +27,9 @@ jobs:
         run: |
           rm -rf node_modules package-lock.json
           npm install --legacy-peer-deps
+          echo "Checking aws-amplify installation..."
+          ls -la node_modules/aws-amplify/
+          npm list aws-amplify
 
       - name: Run linting
         working-directory: frontend
