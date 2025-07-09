@@ -60,7 +60,7 @@ describe('WebSocket Manager', () => {
     // Simulate message
     const testUpdate = {
       deploymentId,
-      status: 'IN_PROGRESS' as const,
+      status: 'DEPLOYING' as const,
       message: 'Test message'
     }
     
