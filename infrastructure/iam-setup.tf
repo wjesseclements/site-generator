@@ -162,7 +162,8 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
           "logs:PutRetentionPolicy",
           "logs:TagResource",
           "logs:UntagResource",
-          "logs:ListTagsLogGroup"
+          "logs:ListTagsLogGroup",
+          "logs:ListTagsForResource"
         ]
         Resource = "*"
       },
