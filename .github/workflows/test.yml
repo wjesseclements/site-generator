@@ -25,8 +25,12 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: |
-          # Use platform-agnostic install for better cross-platform compatibility
-          npm install --prefer-offline
+          # Install dependencies with verification
+          npm install
+          echo "Verifying aws-amplify installation..."
+          ls -la node_modules/aws-amplify/
+          echo "Testing aws-amplify module resolution..."
+          node -e "console.log('AWS Amplify version:', require('aws-amplify/package.json').version)"
 
       - name: Run linting
         working-directory: frontend
@@ -34,7 +38,11 @@ jobs:
 
       - name: Run type checking
         working-directory: frontend
-        run: npx tsc --noEmit
+        run: |
+          echo "Testing TypeScript module resolution..."
+          npx tsc --listFiles --noEmit | head -20 || echo "TypeScript failed"
+          echo "Running actual type checking..."
+          npx tsc --noEmit
 
       - name: Run unit tests
         working-directory: frontend
