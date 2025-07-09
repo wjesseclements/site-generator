@@ -199,6 +199,56 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
         ]
         Resource = "*"
       },
+      # CloudFront Permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "cloudfront:GetDistribution",
+          "cloudfront:GetOriginAccessControl",
+          "cloudfront:CreateDistribution",
+          "cloudfront:UpdateDistribution",
+          "cloudfront:DeleteDistribution",
+          "cloudfront:CreateOriginAccessControl",
+          "cloudfront:UpdateOriginAccessControl",
+          "cloudfront:DeleteOriginAccessControl",
+          "cloudfront:ListDistributions",
+          "cloudfront:ListOriginAccessControls",
+          "cloudfront:TagResource",
+          "cloudfront:UntagResource",
+          "cloudfront:ListTagsForResource"
+        ]
+        Resource = "*"
+      },
+      # SSM Parameters Permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "ssm:GetParameter",
+          "ssm:GetParameters",
+          "ssm:PutParameter",
+          "ssm:DeleteParameter",
+          "ssm:DescribeParameters",
+          "ssm:AddTagsToResource",
+          "ssm:RemoveTagsFromResource",
+          "ssm:ListTagsForResource"
+        ]
+        Resource = "*"
+      },
+      # Enhanced S3 Permissions
+      {
+        Effect = "Allow"
+        Action = [
+          "s3:GetEncryptionConfiguration",
+          "s3:PutEncryptionConfiguration",
+          "s3:GetBucketAcl",
+          "s3:PutBucketAcl",
+          "s3:GetBucketLogging",
+          "s3:PutBucketLogging",
+          "s3:GetBucketNotification",
+          "s3:PutBucketNotification"
+        ]
+        Resource = "*"
+      },
       # Additional AWS services
       {
         Effect = "Allow"
