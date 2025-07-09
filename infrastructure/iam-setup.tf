@@ -21,7 +21,7 @@ resource "aws_iam_openid_connect_provider" "github" {
 # IAM Role for GitHub Actions
 resource "aws_iam_role" "github_actions" {
   count = var.enable_github_actions ? 1 : 0
-  
+
   name = "${local.resource_prefix}-github-actions-deploy"
 
   assume_role_policy = jsonencode({
@@ -51,7 +51,7 @@ resource "aws_iam_role" "github_actions" {
 # Comprehensive IAM Policy for GitHub Actions Terraform Deployment
 resource "aws_iam_role_policy" "github_actions_deploy" {
   count = var.enable_github_actions ? 1 : 0
-  
+
   name = "${local.resource_prefix}-github-actions-deploy"
   role = aws_iam_role.github_actions[0].id
 
