@@ -86,8 +86,12 @@ resource "aws_cognito_user_pool" "main" {
   # MFA configuration
   mfa_configuration = var.environment == "prod" ? "OPTIONAL" : "OFF"
 
-  software_token_mfa_configuration {
-    enabled = var.environment == "prod" ? true : false
+  # Only configure software token MFA when MFA is not OFF
+  dynamic "software_token_mfa_configuration" {
+    for_each = var.environment == "prod" ? [1] : []
+    content {
+      enabled = true
+    }
   }
 
   # User attribute update settings
