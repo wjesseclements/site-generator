@@ -1,10 +1,11 @@
 export interface DeploymentStatusUpdate {
   deploymentId: string;
-  status: 'IN_PROGRESS' | 'SUCCESS' | 'FAILED';
+  status: 'PENDING' | 'INITIALIZING' | 'PLANNING' | 'DEPLOYING' | 'COMPLETED' | 'FAILED' | 'DESTROYING' | 'DESTROYED';
   message: string;
-  action?: string;
-  output?: string;
+  step?: string;
+  outputs?: Record<string, any>;
   error?: string;
+  terraform_output?: string;
 }
 
 export class WebSocketManager {

@@ -1,38 +1,44 @@
 'use client'
 
 import { useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { templates } from '@/lib/templates'
 import { TemplateModal } from '@/components/template-modal-v2'
 import { Template } from '@/lib/templates'
 import { useRouter } from 'next/navigation'
-import { DeploymentStatus } from '@/components/deployment-status'
+import { DeploymentStatusEnhanced } from '@/components/deployment-status-enhanced'
+import { useAuth } from '@/contexts/auth-context'
+import { AuthModal } from '@/components/auth-modal'
+import { authenticatedFetch } from '@/lib/auth'
 
 export default function Home() {
   const [selectedTemplate, setSelectedTemplate] = useState<Template | null>(null)
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [currentDeployment, setCurrentDeployment] = useState<{ id: string; name: string } | null>(null)
   const [showDeploymentStatus, setShowDeploymentStatus] = useState(false)
+  const [showAuthModal, setShowAuthModal] = useState(false)
   const router = useRouter()
+  const { isAuthenticated, user, signOut } = useAuth()
   
   // Deployment indicator
   const buildTime = new Date().toISOString()
 
   const handleTemplateClick = (template: Template) => {
+    if (!isAuthenticated) {
+      setShowAuthModal(true)
+      return
+    }
     setSelectedTemplate(template)
     setIsModalOpen(true)
   }
 
   const handleDeploy = async (values: Record<string, any>) => {
-    if (!selectedTemplate) return
+    if (!selectedTemplate || !isAuthenticated) return
     
     try {
-      // Create deployment via API
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/deployments`, {
+      // Create deployment via authenticated API
+      const response = await authenticatedFetch(`${process.env.NEXT_PUBLIC_API_URL}/deployments`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // TODO: Add authentication header
-        },
         body: JSON.stringify({
           templateId: selectedTemplate.id,
           name: values.siteName || values.name || 'Untitled Deployment',
@@ -71,23 +77,43 @@ export default function Home() {
         background: 'linear-gradient(to bottom right, #0f172a, #000000, #0f172a)',
         color: '#fff',
         position: 'relative',
-        fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif'
+        fontFamily: 'var(--font-geist-sans), system-ui, -apple-system, sans-serif'
       }}>
-        {/* Background Pattern */}
+        {/* Enhanced Background Pattern */}
         <div style={{
           position: 'absolute',
           inset: 0,
-          backgroundImage: `radial-gradient(circle at 25% 25%, #1e293b 0%, transparent 50%),
-                           radial-gradient(circle at 75% 75%, #1e3a8a 0%, transparent 50%)`,
-          opacity: 0.4,
+          background: `
+            radial-gradient(circle at 20% 20%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 80% 80%, rgba(139, 92, 246, 0.15) 0%, transparent 50%),
+            radial-gradient(circle at 60% 40%, rgba(16, 185, 129, 0.1) 0%, transparent 50%)
+          `,
           pointerEvents: 'none'
         }} />
         <div style={{
           position: 'absolute',
           inset: 0,
-          backgroundImage: `linear-gradient(rgba(255, 255, 255, 0.03) 1px, transparent 1px),
-                           linear-gradient(90deg, rgba(255, 255, 255, 0.03) 1px, transparent 1px)`,
-          backgroundSize: '50px 50px',
+          backgroundImage: `
+            linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
+            linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px)
+          `,
+          backgroundSize: '80px 80px',
+          pointerEvents: 'none'
+        }} />
+        <div style={{
+          position: 'absolute',
+          inset: 0,
+          background: `
+            conic-gradient(from 45deg at 50% 50%, 
+              rgba(59, 130, 246, 0.05) 0deg, 
+              transparent 60deg, 
+              rgba(139, 92, 246, 0.05) 120deg, 
+              transparent 180deg, 
+              rgba(16, 185, 129, 0.05) 240deg, 
+              transparent 300deg, 
+              rgba(59, 130, 246, 0.05) 360deg
+            )
+          `,
           pointerEvents: 'none'
         }} />
         {/* Header */}
@@ -118,31 +144,94 @@ export default function Home() {
                   Site Generator Platform
                 </h1>
               </div>
-              <button 
-              onClick={() => router.push('/deployments')}
-              style={{
-                background: 'rgba(59, 130, 246, 0.1)',
-                border: '1px solid rgba(59, 130, 246, 0.3)',
-                color: '#60A5FA',
-                padding: '0.5rem 1.25rem',
-                borderRadius: '8px',
-                cursor: 'pointer',
-                fontSize: '0.875rem',
-                transition: 'all 0.2s ease',
-                fontWeight: '500'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
-                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
-                e.currentTarget.style.transform = 'translateY(-1px)';
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
-                e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
-                e.currentTarget.style.transform = 'translateY(0)';
-              }}>
-                My Deployments
-              </button>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                {isAuthenticated ? (
+                  <>
+                    <span style={{ color: '#9CA3AF', fontSize: '0.875rem' }}>
+                      Welcome, {user?.name || user?.email}
+                    </span>
+                    <button 
+                      onClick={() => router.push('/deployments')}
+                      style={{
+                        background: 'rgba(59, 130, 246, 0.1)',
+                        border: '1px solid rgba(59, 130, 246, 0.3)',
+                        color: '#60A5FA',
+                        padding: '0.5rem 1.25rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        transition: 'all 0.2s ease',
+                        fontWeight: '500'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
+                        e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
+                        e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      My Deployments
+                    </button>
+                    <button 
+                      onClick={signOut}
+                      style={{
+                        background: 'rgba(239, 68, 68, 0.1)',
+                        border: '1px solid rgba(239, 68, 68, 0.3)',
+                        color: '#fca5a5',
+                        padding: '0.5rem 1.25rem',
+                        borderRadius: '8px',
+                        cursor: 'pointer',
+                        fontSize: '0.875rem',
+                        transition: 'all 0.2s ease',
+                        fontWeight: '500'
+                      }}
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)';
+                        e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.5)';
+                        e.currentTarget.style.transform = 'translateY(-1px)';
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.background = 'rgba(239, 68, 68, 0.1)';
+                        e.currentTarget.style.borderColor = 'rgba(239, 68, 68, 0.3)';
+                        e.currentTarget.style.transform = 'translateY(0)';
+                      }}
+                    >
+                      Sign Out
+                    </button>
+                  </>
+                ) : (
+                  <button 
+                    onClick={() => setShowAuthModal(true)}
+                    style={{
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      color: '#60A5FA',
+                      padding: '0.5rem 1.25rem',
+                      borderRadius: '8px',
+                      cursor: 'pointer',
+                      fontSize: '0.875rem',
+                      transition: 'all 0.2s ease',
+                      fontWeight: '500'
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
+                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.5)';
+                      e.currentTarget.style.transform = 'translateY(-1px)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.background = 'rgba(59, 130, 246, 0.1)';
+                      e.currentTarget.style.borderColor = 'rgba(59, 130, 246, 0.3)';
+                      e.currentTarget.style.transform = 'translateY(0)';
+                    }}
+                  >
+                    Sign In
+                  </button>
+                )}
+              </div>
             </div>
           </div>
         </header>
@@ -150,59 +239,95 @@ export default function Home() {
         {/* Main Content */}
         <main style={{ maxWidth: '1280px', margin: '0 auto', padding: '3rem 2rem' }}>
           {/* Hero */}
-          <div style={{ textAlign: 'center', marginBottom: '3rem' }}>
-            <h2 style={{
-              fontSize: '3rem',
-              fontWeight: 'bold',
-              background: 'linear-gradient(to right, #60A5FA, #C084FC)',
-              backgroundClip: 'text',
-              WebkitBackgroundClip: 'text',
-              color: 'transparent',
-              WebkitTextFillColor: 'transparent',
-              marginBottom: '1rem',
-              display: 'inline-block'
-            }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
+            style={{ textAlign: 'center', marginBottom: '3rem' }}
+          >
+            <motion.h2 
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.2, ease: 'easeOut' }}
+              style={{
+                fontSize: '3.5rem',
+                fontWeight: '700',
+                background: 'linear-gradient(135deg, #60A5FA 0%, #C084FC 50%, #34D399 100%)',
+                backgroundClip: 'text',
+                WebkitBackgroundClip: 'text',
+                color: 'transparent',
+                WebkitTextFillColor: 'transparent',
+                marginBottom: '1.5rem',
+                display: 'inline-block',
+                letterSpacing: '-0.02em'
+              }}
+            >
               Choose Your Template
-            </h2>
-            <p style={{ fontSize: '1.125rem', color: '#9CA3AF', maxWidth: '42rem', margin: '0 auto' }}>
+            </motion.h2>
+            <motion.p 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.4, ease: 'easeOut' }}
+              style={{ 
+                fontSize: '1.25rem', 
+                color: '#D1D5DB', 
+                maxWidth: '48rem', 
+                margin: '0 auto',
+                lineHeight: '1.6',
+                fontWeight: '400'
+              }}
+            >
               Select from our pre-configured templates and deploy your infrastructure in minutes.
               Each template is optimized for performance and includes automatic cost tracking.
-            </p>
-          </div>
+            </motion.p>
+          </motion.div>
 
           {/* Template Grid */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
-            gap: '1.5rem',
-            maxWidth: '900px',
-            margin: '0 auto'
-          }}>
-            {templates.map((template) => (
-              <div
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.8, delay: 0.6 }}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))',
+              gap: '1.5rem',
+              maxWidth: '900px',
+              margin: '0 auto'
+            }}
+          >
+            {templates.map((template, index) => (
+              <motion.div
                 key={template.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 0.8 + index * 0.1 }}
+                whileHover={{ 
+                  y: -8, 
+                  scale: 1.02,
+                  transition: { duration: 0.3, ease: 'easeOut' }
+                }}
+                whileTap={{ scale: 0.98 }}
                 onClick={() => handleTemplateClick(template)}
                 style={{
-                  background: 'linear-gradient(to bottom right, #1F2937, #111827)',
+                  background: 'linear-gradient(135deg, #1F2937 0%, #111827 100%)',
                   border: '1px solid #374151',
-                  borderRadius: '16px',
+                  borderRadius: '20px',
                   padding: '2rem',
                   cursor: 'pointer',
-                  transition: 'all 0.3s ease',
                   position: 'relative',
-                  overflow: 'hidden'
+                  overflow: 'hidden',
+                  backdropFilter: 'blur(10px)',
+                  boxShadow: '0 4px 20px rgba(0, 0, 0, 0.1)'
                 }}
                 onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-8px) scale(1.02)';
                   e.currentTarget.style.boxShadow = '0 25px 50px -12px rgba(59, 130, 246, 0.25)';
                   e.currentTarget.style.borderColor = '#60A5FA';
-                  e.currentTarget.style.background = 'linear-gradient(to bottom right, #1F2937, #1a202c)';
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #1F2937 0%, #1a202c 100%)';
                 }}
                 onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0) scale(1)';
-                  e.currentTarget.style.boxShadow = 'none';
+                  e.currentTarget.style.boxShadow = '0 4px 20px rgba(0, 0, 0, 0.1)';
                   e.currentTarget.style.borderColor = '#374151';
-                  e.currentTarget.style.background = 'linear-gradient(to bottom right, #1F2937, #111827)';
+                  e.currentTarget.style.background = 'linear-gradient(135deg, #1F2937 0%, #111827 100%)';
                 }}
               >
 
@@ -222,7 +347,7 @@ export default function Home() {
                       {template.icon}
                     </div>
                     <div>
-                      <h3 style={{ fontSize: '1.25rem', fontWeight: '600', margin: '0 0 0.25rem 0' }}>
+                      <h3 style={{ fontSize: '1.25rem', fontWeight: '600', margin: '0 0 0.25rem 0', letterSpacing: '-0.01em' }}>
                         {template.name}
                       </h3>
                       <span style={{
@@ -259,25 +384,37 @@ export default function Home() {
                     </span>
                   </div>
                 </div>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
 
           {/* Features */}
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
-            gap: '2rem',
-            marginTop: '5rem',
-            maxWidth: '800px',
-            margin: '5rem auto 0'
-          }}>
+          <motion.div 
+            initial={{ opacity: 0, y: 40 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 1.2 }}
+            style={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))',
+              gap: '2rem',
+              marginTop: '5rem',
+              maxWidth: '800px',
+              margin: '5rem auto 0'
+            }}
+          >
             {[
               { icon: '⚡', title: 'Quick Deployment', desc: 'Deploy fully configured websites in under 5 minutes' },
               { icon: '💰', title: 'Cost Tracking', desc: 'Real-time cost monitoring with automatic tagging' },
               { icon: '🔒', title: 'Secure by Default', desc: 'Enterprise-grade security with AWS best practices' }
             ].map((feature, idx) => (
-              <div key={idx} style={{ textAlign: 'center' }}>
+              <motion.div 
+                key={idx} 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6, delay: 1.4 + idx * 0.1 }}
+                whileHover={{ y: -5, transition: { duration: 0.2 } }}
+                style={{ textAlign: 'center' }}
+              >
                 <div style={{
                   width: '48px',
                   height: '48px',
@@ -292,15 +429,15 @@ export default function Home() {
                 }}>
                   {feature.icon}
                 </div>
-                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem' }}>
+                <h3 style={{ fontSize: '1.125rem', fontWeight: '600', marginBottom: '0.5rem', letterSpacing: '-0.01em' }}>
                   {feature.title}
                 </h3>
-                <p style={{ fontSize: '0.875rem', color: '#9CA3AF' }}>
+                <p style={{ fontSize: '0.875rem', color: '#9CA3AF', lineHeight: '1.6' }}>
                   {feature.desc}
                 </p>
-              </div>
+              </motion.div>
             ))}
-          </div>
+          </motion.div>
         </main>
 
       </div>
@@ -314,6 +451,12 @@ export default function Home() {
           setSelectedTemplate(null)
         }}
         onDeploy={handleDeploy}
+      />
+
+      {/* Authentication Modal */}
+      <AuthModal 
+        isOpen={showAuthModal}
+        onClose={() => setShowAuthModal(false)}
       />
 
       {/* Deployment Status Modal */}
@@ -382,7 +525,7 @@ export default function Home() {
               </button>
             </div>
 
-            <DeploymentStatus
+            <DeploymentStatusEnhanced
               deploymentId={currentDeployment.id}
               initialStatus="PENDING"
               websocketUrl={process.env.NEXT_PUBLIC_WEBSOCKET_URL}
