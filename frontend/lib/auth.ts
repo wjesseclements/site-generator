@@ -59,6 +59,11 @@ export interface AuthState {
 // Authentication service class
 export class AuthService {
   static async getCurrentUser(): Promise<User | null> {
+    // During static build, return null to prevent errors
+    if (typeof window === 'undefined') {
+      return null
+    }
+    
     try {
       const user = await getCurrentUser()
       const session = await fetchAuthSession()
@@ -80,6 +85,11 @@ export class AuthService {
   }
 
   static async getAuthHeaders(): Promise<Record<string, string>> {
+    // During static build, return empty headers to prevent errors
+    if (typeof window === 'undefined') {
+      return { 'Content-Type': 'application/json' }
+    }
+    
     try {
       const session = await fetchAuthSession()
       

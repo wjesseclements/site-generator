@@ -200,6 +200,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
 export function useAuth(): AuthContextType {
   const context = useContext(AuthContext)
   if (context === undefined) {
+    // During static build, provide a default context to prevent errors
+    if (typeof window === 'undefined') {
+      return {
+        isAuthenticated: false,
+        isLoading: false,
+        user: null,
+        error: null,
+        signIn: async () => {},
+        signUp: async () => {},
+        signOut: async () => {},
+        confirmSignUp: async () => {},
+        signInWithOAuth: async () => {},
+        resendConfirmationCode: async () => {},
+        clearError: () => {}
+      }
+    }
     throw new Error('useAuth must be used within an AuthProvider')
   }
   return context
