@@ -25,7 +25,8 @@ jobs:
       - name: Install dependencies
         working-directory: frontend
         run: |
-          npm ci
+          # Use platform-agnostic install for better cross-platform compatibility
+          npm install --prefer-offline
 
       - name: Run linting
         working-directory: frontend
