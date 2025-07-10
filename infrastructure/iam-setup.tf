@@ -130,6 +130,7 @@ resource "aws_iam_role_policy" "github_actions_deploy" {
           "iam:TagRole",
           "iam:UntagRole",
           "iam:ListRoleTags",
+          "iam:UpdateAssumeRolePolicy",
           "iam:CreateOpenIDConnectProvider",
           "iam:DeleteOpenIDConnectProvider",
           "iam:GetOpenIDConnectProvider",
