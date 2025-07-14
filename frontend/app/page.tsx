@@ -46,7 +46,8 @@ export default function Home() {
           parameters: values,
           tags: {
             Template: selectedTemplate.name,
-            Category: selectedTemplate.category
+            Category: selectedTemplate.category,
+            TestTag: values.testTag
           }
         })
       })

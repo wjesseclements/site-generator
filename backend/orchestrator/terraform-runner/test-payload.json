@@ -1,0 +1,11 @@
+{
+  "deployment": {
+    "id": "test-deployment",
+    "templateId": "data-explorer",
+    "siteName": "test-site",
+    "parameters": {
+      "siteName": "test-site"
+    }
+  },
+  "action": "init"
+}

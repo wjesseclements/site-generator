@@ -12,14 +12,9 @@ Terraform-based template system for defining, storing, and deploying pre-configu
 - Template versioning and storage
 
 ## Files
-- `/templates/data-explorer/` - Complete template example
-  - `main.tf` - Infrastructure definition
-  - `variables.tf` - Configurable parameters
-  - `outputs.tf` - Deployment outputs
-  - `website/` - Static website files
-  - `lambda/` - Backend function code
-  - `README.md` - Template documentation
+- `/frontend/lib/templates.ts` - Template definitions and parameters
 - `/backend/orchestrator/terraform-runner/index.ts` - Template processing engine
+- External GitOps repository: Template Terraform modules and deployment workflows
 
 ## Template Structure
 Each template includes:
@@ -45,11 +40,17 @@ resource "aws_dynamodb_table" "data_explorer_table" {
 }
 ```
 
+## Available Templates
+1. **Data Explorer** (`data-explorer`) - Interactive database dashboard for data analysis
+2. **Company Pulse** (`company-pulse`) - Corporate announcement and blog platform
+3. **PixelWorks** (`pixelworks`) - Image transformation studio with AI features
+4. **Team Polls** (`team-polls`) - Real-time polls and surveys platform
+
 ## Parameter Types Supported
-- **String**: Site names, descriptions, configurations
-- **Number**: Capacity settings, limits, thresholds
-- **Boolean**: Feature toggles, settings
-- **Select**: Predefined options (themes, regions, sizes)
+- **text**: Site names, descriptions, email addresses
+- **number**: File sizes, capacity settings, thresholds
+- **boolean**: Feature toggles, configuration options
+- **select**: Predefined options (database types, instance sizes, team sizes)
 
 ## Template Processing
 1. **Parameter Validation**: Ensure required fields are provided
@@ -66,7 +67,7 @@ resource "aws_dynamodb_table" "data_explorer_table" {
 - Resource cleanup on deployment deletion
 
 ## Integration Points
-- Template selection triggers parameter form generation
-- Template parameters injected into Terraform variables
-- Deployment outputs stored in DynamoDB
-- Template artifacts stored in S3 for reuse
+- **Frontend**: Template selection triggers dynamic parameter form generation
+- **GitOps**: Parameters injected into Terraform variables via GitHub repository dispatch
+- **Storage**: Deployment outputs stored in DynamoDB for tracking
+- **Deployment**: Template infrastructure deployed via GitHub Actions workflows

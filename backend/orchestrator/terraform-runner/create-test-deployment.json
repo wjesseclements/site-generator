@@ -1,0 +1,32 @@
+{
+  "TableName": "site-generator-dev-deployments",
+  "Item": {
+    "id": {"S": "test-terraform-runner-2025"},
+    "userId": {"S": "1438e408-6041-70dd-f462-a1f49d744ca2"},
+    "templateId": {"S": "data-explorer"},
+    "templateName": {"S": "Data Explorer"},
+    "siteName": {"S": "test-terraform-runner-site"},
+    "parameters": {
+      "M": {
+        "siteName": {"S": "test-terraform-runner-site"},
+        "siteDescription": {"S": "Test deployment for Terraform runner validation"},
+        "adminEmail": {"S": "test@example.com"},
+        "enableTimestampSorting": {"BOOL": true},
+        "enableCategoryIndex": {"BOOL": true},
+        "maxQueryResults": {"N": "100"}
+      }
+    },
+    "status": {"S": "PENDING"},
+    "createdAt": {"S": "2025-07-07T20:40:00.000Z"},
+    "updatedAt": {"S": "2025-07-07T20:40:00.000Z"},
+    "tags": {
+      "M": {
+        "Project": {"S": "test-terraform-runner-site"},
+        "Template": {"S": "data-explorer"},
+        "Owner": {"S": "1438e408-6041-70dd-f462-a1f49d744ca2"},
+        "CreatedBy": {"S": "site-generator"},
+        "CreatedDate": {"S": "2025-07-07"}
+      }
+    }
+  }
+}

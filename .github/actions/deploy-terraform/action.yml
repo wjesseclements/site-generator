@@ -1,0 +1,284 @@
+name: 'Deploy Terraform Infrastructure'
+description: 'Deploy AWS infrastructure using Terraform with proper state management'
+
+inputs:
+  working-directory:
+    description: 'Directory containing Terraform files'
+    required: true
+    default: 'infrastructure'
+  lambda-artifact-version:
+    description: 'Version of Lambda artifacts to deploy'
+    required: true
+  terraform-state-bucket:
+    description: 'S3 bucket for Terraform state'
+    required: true
+  terraform-locks-table:
+    description: 'DynamoDB table for Terraform state locking'
+    required: true
+  environment:
+    description: 'Deployment environment (dev, staging, prod)'
+    required: true
+    default: 'dev'
+  terraform-version:
+    description: 'Terraform version to use'
+    required: false
+    default: '1.5.7'
+  plan-only:
+    description: 'Only run terraform plan, do not apply'
+    required: false
+    default: 'false'
+
+outputs:
+  plan-result:
+    description: 'Result of terraform plan'
+    value: ${{ steps.plan.outputs.result }}
+  apply-result:
+    description: 'Result of terraform apply'
+    value: ${{ steps.apply.outputs.result }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup Terraform
+      uses: hashicorp/setup-terraform@v3
+      with:
+        terraform_version: ${{ inputs.terraform-version }}
+        terraform_wrapper: false
+
+    - name: Configure Terraform backend
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        # Create backend configuration
+        cat > backend.tfvars << EOF
+        bucket         = "${{ inputs.terraform-state-bucket }}"
+        key            = "site-generator/${{ inputs.environment }}/terraform.tfstate"
+        region         = "${{ env.AWS_REGION || 'us-east-1' }}"
+        dynamodb_table = "${{ inputs.terraform-locks-table }}"
+        encrypt        = true
+        EOF
+        
+        echo "Backend configuration created for environment: ${{ inputs.environment }}"
+
+    - name: Create Terraform variables
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        # Create environment-specific terraform.tfvars
+        cat > terraform.auto.tfvars << EOF
+        # Environment configuration
+        environment = "${{ inputs.environment }}"
+        aws_region  = "${{ env.AWS_REGION || 'us-east-1' }}"
+        
+        # Lambda deployment configuration
+        lambda_artifact_version = "${{ inputs.lambda-artifact-version }}"
+        
+        # GitHub Actions configuration
+        enable_github_actions = true
+        github_repository     = "${{ github.repository }}"
+        
+        # Environment-specific settings
+        EOF
+        
+        # Add environment-specific configurations
+        case "${{ inputs.environment }}" in
+          "prod")
+            cat >> terraform.auto.tfvars << EOF
+        project_name = "site-generator"
+        log_retention_days = 30
+        enable_deletion_protection = true
+        
+        # Production CORS origins
+        allowed_origins = [
+          "https://your-production-domain.com"
+        ]
+        
+        # Production tags
+        tags = {
+          Environment = "production"
+          Team        = "Platform"
+          CostCenter  = "Engineering"
+        }
+        EOF
+            ;;
+          "staging")
+            cat >> terraform.auto.tfvars << EOF
+        project_name = "site-generator-staging"
+        log_retention_days = 14
+        enable_deletion_protection = false
+        
+        # Staging CORS origins
+        allowed_origins = [
+          "https://staging.your-domain.com",
+          "http://localhost:3000"
+        ]
+        
+        # Staging tags
+        tags = {
+          Environment = "staging"
+          Team        = "Platform"
+          CostCenter  = "Engineering"
+        }
+        EOF
+            ;;
+          "dev"|*)
+            cat >> terraform.auto.tfvars << EOF
+        project_name = "site-generator-dev"
+        log_retention_days = 7
+        enable_deletion_protection = false
+        
+        # Development CORS origins
+        allowed_origins = [
+          "http://localhost:3000",
+          "http://localhost:3001"
+        ]
+        
+        # Development tags
+        tags = {
+          Environment = "development"
+          Team        = "Platform"
+          CostCenter  = "Engineering"
+        }
+        EOF
+            ;;
+        esac
+        
+        echo "Environment-specific variables created for: ${{ inputs.environment }}"
+
+    - name: Terraform Init
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "Initializing Terraform with backend configuration..."
+        terraform init -backend-config=backend.tfvars
+        
+        # Verify backend configuration
+        terraform providers
+
+    - name: Terraform Validate
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "Validating Terraform configuration..."
+        terraform validate
+
+    - name: Terraform Format Check
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "Checking Terraform formatting..."
+        terraform fmt -check=true -diff=true
+
+    - name: Terraform Plan
+      id: plan
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "Running Terraform plan..."
+        
+        # Run terraform plan and capture output
+        if terraform plan -out=tfplan -var-file=terraform.auto.tfvars; then
+          echo "result=success" >> $GITHUB_OUTPUT
+          echo "✅ Terraform plan completed successfully"
+          
+          # Show plan summary
+          terraform show -no-color tfplan > plan-output.txt
+          
+          # Count changes
+          ADDITIONS=$(grep -c "# .* will be created" plan-output.txt || echo "0")
+          CHANGES=$(grep -c "# .* will be updated" plan-output.txt || echo "0")
+          DESTRUCTIONS=$(grep -c "# .* will be destroyed" plan-output.txt || echo "0")
+          
+          echo "📊 Plan Summary:"
+          echo "  - Resources to add: $ADDITIONS"
+          echo "  - Resources to change: $CHANGES"
+          echo "  - Resources to destroy: $DESTRUCTIONS"
+          
+          # Save summary for PR comments
+          cat > plan-summary.txt << EOF
+        ## Terraform Plan Summary
+        
+        **Environment:** ${{ inputs.environment }}
+        **Lambda Artifact Version:** ${{ inputs.lambda-artifact-version }}
+        
+        ### Changes:
+        - **Add:** $ADDITIONS resources
+        - **Change:** $CHANGES resources
+        - **Destroy:** $DESTRUCTIONS resources
+        
+        <details>
+        <summary>View Full Plan</summary>
+        
+        \`\`\`
+        $(cat plan-output.txt)
+        \`\`\`
+        
+        </details>
+        EOF
+          
+        else
+          echo "result=failure" >> $GITHUB_OUTPUT
+          echo "❌ Terraform plan failed"
+          exit 1
+        fi
+
+    - name: Terraform Apply
+      id: apply
+      if: inputs.plan-only != 'true' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/dev')
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        echo "Applying Terraform changes..."
+        
+        if terraform apply -auto-approve tfplan; then
+          echo "result=success" >> $GITHUB_OUTPUT
+          echo "✅ Terraform apply completed successfully"
+          
+          # Get outputs
+          echo "📤 Terraform Outputs:"
+          terraform output -json > outputs.json
+          
+          # Display key outputs
+          if command -v jq >/dev/null 2>&1; then
+            echo "  - API Gateway URL: $(terraform output -raw api_gateway_url 2>/dev/null || echo 'Not available')"
+            echo "  - WebSocket URL: $(terraform output -raw websocket_url 2>/dev/null || echo 'Not available')"
+            echo "  - Frontend Bucket: $(terraform output -raw frontend_bucket_name 2>/dev/null || echo 'Not available')"
+          fi
+          
+        else
+          echo "result=failure" >> $GITHUB_OUTPUT
+          echo "❌ Terraform apply failed"
+          exit 1
+        fi
+
+    - name: Upload Terraform outputs
+      if: steps.apply.outcome == 'success'
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        # Upload outputs as GitHub Actions artifact for other workflows
+        if [ -f "outputs.json" ]; then
+          echo "Uploading Terraform outputs..."
+          
+          # Also create a simplified outputs file for easy consumption
+          cat > simplified-outputs.json << EOF
+        {
+          "environment": "${{ inputs.environment }}",
+          "artifact_version": "${{ inputs.lambda-artifact-version }}",
+          "timestamp": "$(date -u +%Y-%m-%dT%H:%M:%SZ)",
+          "outputs": $(cat outputs.json)
+        }
+        EOF
+        fi
+
+    - name: Cleanup
+      if: always()
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: |
+        # Clean up temporary files
+        rm -f backend.tfvars
+        rm -f terraform.auto.tfvars
+        rm -f tfplan
+        rm -f plan-output.txt
+        echo "Cleaned up temporary Terraform files"

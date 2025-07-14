@@ -59,6 +59,7 @@ export interface CreateDeploymentRequest {
   templateId: string
   parameters: Record<string, any>
   targetAccount?: string
+  tags: Record<string, string>
 }
 
 export interface WebSocketConnection {

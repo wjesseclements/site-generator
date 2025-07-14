@@ -3,7 +3,7 @@
     "target": "ES2022",
     "lib": ["ES2022"],
     "module": "commonjs",
-    "moduleResolution": "nodenext",
+    "moduleResolution": "node",
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
     "esModuleInterop": true,
@@ -13,11 +13,12 @@
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
     "outDir": "./dist",
-    "rootDir": "./",
+    "rootDir": "../../",
     "types": ["node", "jest"]
   },
   "include": [
-    "**/*.ts"
+    "*.ts",
+    "../../libs/**/*.ts"
   ],
   "exclude": [
     "node_modules",

@@ -1,0 +1,97 @@
+{
+  "api_gateway_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "https://9nfgcldtyc.execute-api.us-east-1.amazonaws.com/dev"
+  },
+  "cognito_hosted_ui_domain": {
+    "sensitive": false,
+    "type": "string",
+    "value": "https://site-generator-dev-050752625591.auth.us-east-1.amazoncognito.com"
+  },
+  "cognito_identity_pool_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "us-east-1:96e1df23-e527-42fd-b05f-5bcb5834bb73"
+  },
+  "cognito_user_pool_client_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "40frognlq2q4abnre4ucvff4s0"
+  },
+  "cognito_user_pool_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "us-east-1_fqab3yeYI"
+  },
+  "connections_table_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "site-generator-dev-connections"
+  },
+  "cross_account_role_template": {
+    "sensitive": false,
+    "type": [
+      "object",
+      {
+        "external_id_required": "string",
+        "note": "string",
+        "policy_attachment_needed": "string",
+        "role_name": "string",
+        "trusted_principal_arn": "string"
+      }
+    ],
+    "value": {
+      "external_id_required": "site-generator-deployment",
+      "note": "Currently disabled for single-account deployment",
+      "policy_attachment_needed": "PowerUserAccess or custom policy",
+      "role_name": "site-generator-dev-deploy-role",
+      "trusted_principal_arn": "arn:aws:iam::050752625591:role/site-generator-dev-github-actions-deploy"
+    }
+  },
+  "deployment_instructions": {
+    "sensitive": false,
+    "type": "string",
+    "value": "To deploy the frontend:\n1. Build the Next.js app: cd ../frontend \u0026\u0026 npm run build\n2. Upload to S3: aws s3 sync out/ s3://site-generator-dev-frontend/ --delete\n3. Access the site at: site-generator-dev-frontend.s3-website-us-east-1.amazonaws.com\n    \nTo configure the frontend:\n1. Update frontend/.env.local with:\n   NEXT_PUBLIC_API_URL=https://9nfgcldtyc.execute-api.us-east-1.amazonaws.com/dev\n   NEXT_PUBLIC_WEBSOCKET_URL=wss://w12v036fff.execute-api.us-east-1.amazonaws.com/dev\n   NEXT_PUBLIC_USER_POOL_ID=us-east-1_fqab3yeYI\n   NEXT_PUBLIC_USER_POOL_CLIENT_ID=40frognlq2q4abnre4ucvff4s0\n   NEXT_PUBLIC_IDENTITY_POOL_ID=us-east-1:96e1df23-e527-42fd-b05f-5bcb5834bb73\n   NEXT_PUBLIC_REGION=us-east-1\n"
+  },
+  "deployment_table_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "site-generator-dev-deployments"
+  },
+  "frontend_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "http://site-generator-dev-frontend.s3-website-us-east-1.amazonaws.com"
+  },
+  "github_actions_role_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:iam::050752625591:role/site-generator-dev-github-actions-deploy"
+  },
+  "lambda_deployment_bucket": {
+    "sensitive": false,
+    "type": "string",
+    "value": "site-generator-dev-lambda-deployments"
+  },
+  "step_functions_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:states:us-east-1:050752625591:stateMachine:site-generator-dev-deployment-orchestrator"
+  },
+  "terraform_deploy_role_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:iam::050752625591:role/site-generator-dev-terraform-deploy"
+  },
+  "terraform_state_bucket": {
+    "sensitive": false,
+    "type": "string",
+    "value": "site-generator-dev-terraform-states"
+  },
+  "websocket_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "wss://w12v036fff.execute-api.us-east-1.amazonaws.com/dev"
+  }
+}

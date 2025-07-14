@@ -78,3 +78,12 @@ logs/
 # Temporary files
 tmp/
 temp/
+
+# GitHub Actions
+.github/workflows/artifacts/
+.github/actions/*/dist/
+
+# CI/CD artifacts
+artifacts/
+deployment-artifacts/
+*.deployment.json

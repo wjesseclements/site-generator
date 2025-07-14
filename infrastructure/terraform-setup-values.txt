@@ -1,0 +1,25 @@
+Site Generator Infrastructure Setup Values
+==========================================
+
+Generated webhook secret (use this in terraform.tfvars):
+github_webhook_secret = "5dcff7079beba2100dc5159fce554ad9164268bc67f5c8853830e128637601d6"
+
+After terraform apply, you'll need these values for GitHub repository secrets:
+
+1. AWS_ROLE_ARN
+   - Will be output after terraform apply
+   - Format: arn:aws:iam::YOUR_ACCOUNT:role/site-generator-dev-github-actions
+
+2. WEBHOOK_SECRET
+   - Use the same value as above: 5dcff7079beba2100dc5159fce554ad9164268bc67f5c8853830e128637601d6
+
+3. TERRAFORM_STATE_BUCKET
+   - Run after terraform apply: terraform output terraform_state_bucket_name
+
+4. TERRAFORM_LOCKS_TABLE
+   - Run after terraform apply: terraform output terraform_locks_table_name
+
+GitHub Personal Access Token:
+- Still needs to be generated at https://github.com/settings/tokens
+- Required scope: repo (Full control of private repositories)
+- Use in terraform.tfvars as: github_token = "ghp_your_generated_token"

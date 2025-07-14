@@ -120,14 +120,14 @@ resource "aws_cognito_user_pool_client" "web_client" {
     "http://localhost:3000",
     "http://localhost:3001",
     var.frontend_domain != "" ? "https://${var.frontend_domain}" : "",
-    aws_s3_bucket_website_configuration.frontend.website_endpoint
+    "https://${aws_cloudfront_distribution.frontend.domain_name}"
   ])
 
   logout_urls = compact([
     "http://localhost:3000",
     "http://localhost:3001",
     var.frontend_domain != "" ? "https://${var.frontend_domain}" : "",
-    aws_s3_bucket_website_configuration.frontend.website_endpoint
+    "https://${aws_cloudfront_distribution.frontend.domain_name}"
   ])
 
   # Client settings

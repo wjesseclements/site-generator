@@ -270,6 +270,53 @@ export function TemplateModal({ template, isOpen, onClose, onDeploy }: TemplateM
           {/* Form */}
           <form onSubmit={handleSubmit} style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* Required Tag Field */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#D1D5DB',
+                  marginBottom: '0.5rem'
+                }}>
+                  Test Tag
+                  <span style={{ color: '#EF4444', marginLeft: '0.25rem' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={values.testTag ?? ''}
+                  onChange={(e) => setValues({ ...values, testTag: e.target.value })}
+                  placeholder="Enter a tag to identify this test deployment (e.g., test-2025-01-15)"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    background: 'rgba(31, 41, 55, 0.5)',
+                    border: '1px solid rgba(75, 85, 99, 0.5)',
+                    borderRadius: '8px',
+                    color: '#fff',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(96, 165, 250, 0.5)'
+                    e.currentTarget.style.background = 'rgba(31, 41, 55, 0.8)'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(75, 85, 99, 0.5)'
+                    e.currentTarget.style.background = 'rgba(31, 41, 55, 0.5)'
+                  }}
+                />
+                <p style={{
+                  marginTop: '0.25rem',
+                  fontSize: '0.75rem',
+                  color: '#6B7280'
+                }}>
+                  This tag will be applied to all AWS resources for easy identification and cleanup
+                </p>
+              </div>
+
               {template.parameters.map((param) => (
                 <div key={param.name}>
                   <label style={{

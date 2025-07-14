@@ -38,7 +38,10 @@ resource "aws_iam_role" "github_actions" {
             "token.actions.githubusercontent.com:aud" = "sts.amazonaws.com"
           }
           StringLike = {
-            "token.actions.githubusercontent.com:sub" = "repo:${var.github_repository}:*"
+            "token.actions.githubusercontent.com:sub" = [
+              "repo:${var.github_repository}:*",
+              "repo:${var.github_repo_owner}/${var.github_repo_name}:*"
+            ]
           }
         }
       }
@@ -426,9 +429,11 @@ resource "aws_iam_role_policy" "terraform_deploy" {
 }
 
 # Cross-Account Deployment Role Template
-# This creates a role that can be assumed by the Site Generator platform
-# to deploy resources in other AWS accounts
+# This creates a role that can be assumed by GitHub Actions for cross-account deployments
+# Currently not used as deployments are within the same account
 resource "aws_iam_role" "cross_account_deploy_template" {
+  count = 0  # Disabled for single-account deployment
+
   name = "${local.resource_prefix}-cross-account-deploy-template"
 
   assume_role_policy = jsonencode({
@@ -437,7 +442,7 @@ resource "aws_iam_role" "cross_account_deploy_template" {
       {
         Effect = "Allow"
         Principal = {
-          AWS = aws_iam_role.terraform_runner_execution.arn
+          AWS = var.enable_github_actions ? aws_iam_role.github_actions[0].arn : null
         }
         Action = "sts:AssumeRole"
         Condition = {
@@ -469,8 +474,9 @@ output "cross_account_role_template" {
   description = "Template for creating cross-account deployment roles"
   value = {
     role_name                = "${local.resource_prefix}-deploy-role"
-    trusted_principal_arn    = aws_iam_role.terraform_runner_execution.arn
+    trusted_principal_arn    = var.enable_github_actions ? aws_iam_role.github_actions[0].arn : null
     external_id_required     = var.cross_account_external_id
     policy_attachment_needed = "PowerUserAccess or custom policy"
+    note                     = "Currently disabled for single-account deployment"
   }
 }

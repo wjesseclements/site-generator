@@ -1,0 +1,253 @@
+name: 'Build Lambda Functions'
+description: 'Build and upload Lambda functions to S3 with optimized packaging'
+
+inputs:
+  artifact-version:
+    description: 'Version identifier for the Lambda artifacts'
+    required: true
+  s3-bucket:
+    description: 'S3 bucket for Lambda deployment artifacts'
+    required: true
+  aws-region:
+    description: 'AWS region for S3 uploads'
+    required: false
+    default: 'us-east-1'
+
+outputs:
+  artifact-version:
+    description: 'The artifact version that was built and uploaded'
+    value: ${{ inputs.artifact-version }}
+  upload-summary:
+    description: 'Summary of uploaded Lambda functions'
+    value: ${{ steps.upload.outputs.summary }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Setup build environment
+      shell: bash
+      run: |
+        echo "Setting up Lambda build environment"
+        echo "Artifact version: ${{ inputs.artifact-version }}"
+        echo "S3 bucket: ${{ inputs.s3-bucket }}"
+
+    - name: Install backend dependencies
+      shell: bash
+      working-directory: backend
+      run: |
+        # Install root dependencies
+        npm install
+        
+        # Install dependencies for each Lambda function
+        find . -name "package.json" -not -path "./node_modules/*" -not -path "./dist/*" | while read package_file; do
+          dir=$(dirname "$package_file")
+          echo "Installing dependencies in $dir"
+          cd "$dir"
+          npm install --silent --production=false
+          cd - > /dev/null
+        done
+
+    - name: Build Lambda functions with esbuild
+      shell: bash
+      working-directory: backend
+      run: |
+        # Create build directory
+        BUILD_DIR=$(mktemp -d)
+        echo "BUILD_DIR=$BUILD_DIR" >> $GITHUB_ENV
+        
+        # Color codes for output
+        GREEN='\033[0;32m'
+        BLUE='\033[0;34m'
+        YELLOW='\033[1;33m'
+        NC='\033[0m'
+        
+        echo -e "${BLUE}📦 Building Lambda functions with AWS optimizations...${NC}"
+        
+        # Auto-discover Lambda functions
+        FUNCTIONS=()
+        while IFS= read -r -d '' func_path; do
+          rel_path=${func_path#$PWD/}
+          func_dir=${rel_path%/index.ts}
+          FUNCTIONS+=("$func_dir")
+        done < <(find . -name "index.ts" -not -path "./node_modules/*" -not -path "./terraform-runner/*" -print0)
+        
+        echo -e "${BLUE}📍 Discovered functions: ${FUNCTIONS[*]}${NC}"
+        
+        # Build each function
+        for func_path in "${FUNCTIONS[@]}"; do
+          if [[ "$func_path" == api/* ]]; then
+            func_category="api"
+          elif [[ "$func_path" == orchestrator/* ]]; then
+            func_category="orchestrator"
+          elif [[ "$func_path" == websocket/* ]]; then
+            func_category="websocket"
+          fi
+          func_name=$(basename "$func_path")
+          
+          echo -e "${BLUE}📦 Building ${func_path}...${NC}"
+          
+          if [ ! -d "$func_path" ]; then
+            echo -e "${RED}❌ Directory not found: ${func_path}${NC}"
+            continue
+          fi
+          
+          cd "$func_path"
+          
+          # Clean start
+          rm -rf node_modules dist build *.js package-lock.json deploy 2>/dev/null || true
+          
+          # Install dependencies
+          echo -e "${YELLOW}  📥 Installing dependencies...${NC}"
+          npm install --silent
+          
+          # Bundle with esbuild
+          echo -e "${YELLOW}  🔧 Bundling with esbuild...${NC}"
+          cd - > /dev/null
+          
+          # Bundle the function with all dependencies resolved
+          if ! npx esbuild "${func_path}/index.ts" \
+            --bundle \
+            --platform=node \
+            --target=node20 \
+            --format=cjs \
+            --outfile="${func_path}/dist/index.js" \
+            --external:aws-sdk \
+            --external:uuid; then
+            echo -e "${RED}❌ esbuild bundling failed for ${func_path}${NC}"
+            continue
+          fi
+          
+          cd "$func_path"
+          
+          # Create deployment directory
+          DEPLOY_DIR="$BUILD_DIR/${func_category}-${func_name}"
+          mkdir -p "$DEPLOY_DIR"
+          
+          # Copy bundled JavaScript file
+          if [ -f "dist/index.js" ]; then
+            echo -e "${YELLOW}  📁 Copying bundled JavaScript...${NC}"
+            cp dist/index.js "$DEPLOY_DIR/index.js"
+          else
+            echo -e "${RED}❌ No bundled JavaScript found for ${func_path}${NC}"
+            cd - > /dev/null
+            continue
+          fi
+          
+          # Create optimized package.json
+          if [[ "$func_path" == "api/create-deployment" ]]; then
+            cat > "$DEPLOY_DIR/package.json" << 'EOF'
+{
+  "name": "create-deployment",
+  "version": "1.0.0",
+  "main": "index.js",
+  "dependencies": {
+    "uuid": "^9.0.0",
+    "aws-sdk": "^2.1500.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
+EOF
+          else
+            cat > "$DEPLOY_DIR/package.json" << 'EOF'
+{
+  "name": "lambda-function",
+  "version": "1.0.0", 
+  "main": "index.js",
+  "dependencies": {
+    "aws-sdk": "^2.1500.0"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
+EOF
+          fi
+          
+          # Install production dependencies
+          cd "$DEPLOY_DIR"
+          npm install --production --no-audit --no-fund --no-optional --silent
+          
+          # Optimize package size
+          find node_modules -name "*.md" -delete 2>/dev/null || true
+          find node_modules -name "LICENSE*" -delete 2>/dev/null || true
+          find node_modules -name "CHANGELOG*" -delete 2>/dev/null || true
+          find node_modules -name "*.d.ts" -delete 2>/dev/null || true
+          find node_modules -name "test*" -type d -exec rm -rf {} + 2>/dev/null || true
+          find node_modules -name "*.map" -delete 2>/dev/null || true
+          
+          cd - > /dev/null
+          
+          # Create deployment package
+          cd "$DEPLOY_DIR"
+          PACKAGE_NAME="${func_category}-${func_name}-${{ inputs.artifact-version }}.zip"
+          zip -rq "$BUILD_DIR/$PACKAGE_NAME" . > /dev/null
+          cd - > /dev/null
+          
+          # Get package size
+          PACKAGE_SIZE=$(du -h "$BUILD_DIR/$PACKAGE_NAME" | cut -f1)
+          echo -e "${GREEN}  ✅ Created $PACKAGE_NAME (${PACKAGE_SIZE})${NC}"
+          
+          cd - > /dev/null
+        done
+
+    - name: Upload to S3
+      id: upload
+      shell: bash
+      run: |
+        cd backend
+        BUILD_DIR=${{ env.BUILD_DIR }}
+        
+        # Color codes
+        GREEN='\033[0;32m'
+        BLUE='\033[0;34m'
+        YELLOW='\033[1;33m'
+        NC='\033[0m'
+        
+        echo -e "${BLUE}☁️  Uploading Lambda packages to S3...${NC}"
+        
+        UPLOADED_FUNCTIONS=()
+        
+        # Upload each package
+        for package in "$BUILD_DIR"/*.zip; do
+          if [ -f "$package" ]; then
+            package_name=$(basename "$package")
+            
+            # Extract function info from package name
+            func_info=${package_name%-${{ inputs.artifact-version }}.zip}
+            IFS='-' read -r category name <<< "$func_info"
+            
+            S3_KEY="${category}/${name}/${{ inputs.artifact-version }}.zip"
+            
+            echo -e "${YELLOW}  📤 Uploading $package_name to s3://${{ inputs.s3-bucket }}/${S3_KEY}...${NC}"
+            
+            if aws s3 cp "$package" "s3://${{ inputs.s3-bucket }}/$S3_KEY" \
+              --metadata "function=${name},category=${category},version=${{ inputs.artifact-version }},build-time=$(date -u +%Y-%m-%dT%H:%M:%SZ),github-sha=${{ github.sha }},github-run=${{ github.run_number }}" \
+              --storage-class STANDARD_IA; then
+              echo -e "${GREEN}  ✅ Uploaded successfully${NC}"
+              UPLOADED_FUNCTIONS+=("${category}/${name}")
+              
+              # Also upload as 'latest' for easy reference
+              LATEST_S3_KEY="${category}/${name}/latest.zip"
+              aws s3 cp "s3://${{ inputs.s3-bucket }}/$S3_KEY" "s3://${{ inputs.s3-bucket }}/$LATEST_S3_KEY" > /dev/null || echo -e "${YELLOW}  ⚠️  Latest copy failed (non-critical)${NC}"
+            else
+              echo -e "${RED}  ❌ Upload failed${NC}"
+            fi
+          fi
+        done
+        
+        # Set output summary
+        SUMMARY=$(printf '%s\n' "${UPLOADED_FUNCTIONS[@]}" | tr '\n' ',' | sed 's/,$//')
+        echo "summary=$SUMMARY" >> $GITHUB_OUTPUT
+        
+        echo -e "${GREEN}🎉 Upload complete! Functions: $SUMMARY${NC}"
+
+    - name: Cleanup build directory
+      if: always()
+      shell: bash
+      run: |
+        if [ -n "${{ env.BUILD_DIR }}" ] && [ -d "${{ env.BUILD_DIR }}" ]; then
+          rm -rf "${{ env.BUILD_DIR }}"
+          echo "Cleaned up build directory"
+        fi

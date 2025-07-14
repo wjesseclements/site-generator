@@ -29,6 +29,20 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       }
     }
 
+    // Validate required TestTag
+    if (!request.tags?.TestTag) {
+      return {
+        statusCode: 400,
+        headers: {
+          'Content-Type': 'application/json',
+          'Access-Control-Allow-Origin': '*'
+        },
+        body: JSON.stringify({
+          error: 'TestTag is required for tracking and cleanup purposes'
+        })
+      }
+    }
+
     // Get user ID from Cognito authorizer
     const userId = event.requestContext.authorizer?.claims?.sub || 'test-user'
     
@@ -49,7 +63,9 @@ export const handler: APIGatewayProxyHandler = async (event) => {
         'Template': request.templateId,
         'Owner': userId,
         'CreatedBy': 'site-generator',
-        'CreatedDate': new Date().toISOString().split('T')[0]
+        'CreatedDate': new Date().toISOString().split('T')[0],
+        'TestTag': request.tags.TestTag,
+        ...request.tags // Include any additional tags from frontend
       }
     }
 
