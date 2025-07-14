@@ -25,14 +25,15 @@ echo -e "${BLUE}Artifact Version: ${ARTIFACT_VERSION}${NC}"
 echo -e "${BLUE}S3 Bucket: ${S3_BUCKET}${NC}"
 
 # Auto-discover Lambda functions by finding directories with index.ts
+BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 FUNCTIONS=()
 while IFS= read -r -d '' func_path; do
   # Convert absolute path to relative path from backend directory
-  rel_path=${func_path#/Users/jc/dev/site-generator/backend/}
+  rel_path=${func_path#${BACKEND_DIR}/}
   # Remove /index.ts suffix to get directory path  
   func_dir=${rel_path%/index.ts}
   FUNCTIONS+=("$func_dir")
-done < <(find /Users/jc/dev/site-generator/backend -name "index.ts" -not -path "*/node_modules/*" -not -path "*/terraform-runner/*" -print0)
+done < <(find "$BACKEND_DIR" -name "index.ts" -not -path "*/node_modules/*" -not -path "*/terraform-runner/*" -print0)
 
 echo -e "${BLUE}📍 Discovered functions: ${FUNCTIONS[*]}${NC}"
 
