@@ -48,12 +48,15 @@ export const handler: Handler<GitHubDispatchEvent> = async (event) => {
     const dispatchPayload = {
       event_type: 'infrastructure-deployment',
       client_payload: {
-        deployment_id: deployment.id,
+        deploymentId: deployment.id,
         action: action,
-        template_id: deployment.templateId,
-        site_name: deployment.siteName,
+        templateName: deployment.templateId, // GitHub Actions expects templateName with templateId format
+        siteName: deployment.siteName,
         environment: ENVIRONMENT,
         parameters: deployment.parameters,
+        userId: deployment.userId,
+        createdAt: deployment.createdAt,
+        callbackUrl: WEBHOOK_ENDPOINT,
         tags: {
           ...deployment.tags,
           DeploymentId: deployment.id,
@@ -61,8 +64,7 @@ export const handler: Handler<GitHubDispatchEvent> = async (event) => {
           CreatedBy: deployment.userId,
           CreatedDate: deployment.createdAt.split('T')[0],
           Environment: ENVIRONMENT
-        },
-        webhook_url: WEBHOOK_ENDPOINT
+        }
       }
     }
     
