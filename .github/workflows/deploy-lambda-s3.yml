@@ -1,12 +1,6 @@
 name: Deploy Lambda Functions to S3 (AWS Best Practice)
 
 on:
-  push:
-    branches: [main, dev]
-    paths: ['backend/**', 'infrastructure/**']
-  pull_request:
-    branches: [main]
-    paths: ['backend/**', 'infrastructure/**']
   workflow_dispatch:
     inputs:
       environment:
