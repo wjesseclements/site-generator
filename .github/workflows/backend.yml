@@ -154,36 +154,85 @@ jobs:
           aws-region: ${{ env.AWS_REGION }}
           role-session-name: GitHubActions-Integration-${{ github.run_id }}
 
+      - name: Setup Terraform for integration tests
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.8.0
+          terraform_wrapper: false
+
+      - name: Initialize Terraform and get infrastructure outputs
+        working-directory: infrastructure
+        run: |
+          echo "🔧 Initializing Terraform to read infrastructure outputs..."
+          terraform init
+          
+          echo "📍 Reading infrastructure endpoints..."
+          API_URL=$(terraform output -raw api_gateway_url)
+          WS_URL=$(terraform output -raw websocket_url)
+          
+          echo "API_URL=$API_URL" >> $GITHUB_ENV
+          echo "WS_URL=$WS_URL" >> $GITHUB_ENV
+          
+          echo "✅ Infrastructure outputs retrieved:"
+          echo "  API Gateway: $API_URL"
+          echo "  WebSocket: $WS_URL"
+
       - name: Test API endpoints
         run: |
-          # Use known API URL from infrastructure or initialize Terraform to get outputs
-          API_URL="https://9nfgcldtyc.execute-api.us-east-1.amazonaws.com/dev"
+          echo "🧪 Testing API Gateway endpoints..."
+          echo "API URL: $API_URL"
           
-          echo "Testing API at: $API_URL"
-          
-          # Test basic connectivity
-          if curl -f -s "$API_URL/" >/dev/null 2>&1; then
-            echo "✅ API Gateway is reachable"
-          else
-            echo "⚠️  API Gateway not responding (expected for new deployment)"
+          # Test API Gateway root - this should work for a properly deployed API
+          echo "Testing API Gateway connectivity..."
+          if ! curl -f -s "$API_URL/" >/dev/null 2>&1; then
+            echo "❌ API Gateway root endpoint not responding"
+            echo "This indicates a deployment or configuration issue"
+            exit 1
           fi
+          echo "✅ API Gateway is responding"
           
-          # Test CORS preflight (non-failing)
-          if curl -f -s -X OPTIONS "$API_URL/deployments" \
+          # Test CORS preflight for deployments endpoint
+          echo "Testing CORS configuration..."
+          if ! curl -f -s -X OPTIONS "$API_URL/deployments" \
             -H "Origin: http://localhost:3000" \
-            -H "Access-Control-Request-Method: POST" >/dev/null 2>&1; then
-            echo "✅ CORS preflight successful"
-          else
-            echo "⚠️  CORS preflight failed (may need infrastructure sync)"
+            -H "Access-Control-Request-Method: POST" \
+            -H "Access-Control-Request-Headers: Content-Type,Authorization" >/dev/null 2>&1; then
+            echo "❌ CORS preflight failed"
+            echo "This will prevent frontend from making API calls"
+            exit 1
           fi
+          echo "✅ CORS configuration is working"
           
-          echo "✅ Integration test completed (non-blocking)"
+          # Test that deployments endpoint exists (should return 401/403 without auth)
+          echo "Testing deployments endpoint structure..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$API_URL/deployments")
+          if [[ "$HTTP_CODE" =~ ^(401|403|405)$ ]]; then
+            echo "✅ Deployments endpoint exists (returned $HTTP_CODE as expected without auth)"
+          else
+            echo "⚠️  Deployments endpoint returned unexpected code: $HTTP_CODE"
+            echo "Expected 401/403 (auth required) or 405 (method not allowed)"
+          fi
 
       - name: Test WebSocket connection
         run: |
-          # Test WebSocket endpoint with known URL
-          WS_URL="wss://w12v036fff.execute-api.us-east-1.amazonaws.com/dev"
+          echo "🧪 Testing WebSocket Gateway..."
+          echo "WebSocket URL: $WS_URL"
           
-          echo "WebSocket URL available: $WS_URL"
-          echo "✅ WebSocket configuration verified (full testing requires client)"
-          echo "✅ Integration tests completed successfully"
+          # Test WebSocket endpoint accessibility (HTTP upgrade should be available)
+          # Convert WSS URL to HTTPS for initial connectivity test
+          HTTP_WS_URL="${WS_URL/wss:/https:}"
+          
+          echo "Testing WebSocket Gateway connectivity..."
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$HTTP_WS_URL")
+          if [[ "$HTTP_CODE" =~ ^(426|403|404)$ ]]; then
+            echo "✅ WebSocket Gateway is accessible (HTTP $HTTP_CODE as expected)"
+            echo "  426 = Upgrade Required (normal for WebSocket)"
+            echo "  403 = Forbidden (auth required)"  
+            echo "  404 = Not Found (may need specific path)"
+          else
+            echo "⚠️  WebSocket Gateway returned unexpected code: $HTTP_CODE"
+            echo "WebSocket may not be properly configured"
+          fi
+          
+          echo "✅ Core integration tests completed successfully"
+          echo "🎯 Infrastructure is ready for tag feature testing"
