@@ -15,15 +15,22 @@ export class WebSocketManager {
   private maxReconnectAttempts: number = 5;
   private reconnectAttempts: number = 0;
   private listeners: Map<string, (update: DeploymentStatusUpdate) => void> = new Map();
+  private authToken: string | null = null;
 
-  constructor(url: string) {
+  constructor(url: string, authToken?: string) {
     this.url = url;
+    this.authToken = authToken || null;
   }
 
   connect(): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
-        this.ws = new WebSocket(this.url);
+        // Add authentication token to WebSocket URL as query parameter
+        const wsUrl = this.authToken 
+          ? `${this.url}?token=${encodeURIComponent(this.authToken)}`
+          : this.url;
+        
+        this.ws = new WebSocket(wsUrl);
 
         this.ws.onopen = () => {
           console.log('WebSocket connected');
@@ -87,6 +94,10 @@ export class WebSocketManager {
 
   unsubscribeFromDeployment(deploymentId: string) {
     this.listeners.delete(deploymentId);
+  }
+
+  updateAuthToken(token: string) {
+    this.authToken = token;
   }
 
   disconnect() {

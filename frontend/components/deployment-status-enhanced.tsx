@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { WebSocketManager, DeploymentStatusUpdate } from '@/lib/websocket';
+import { AuthService } from '@/lib/auth';
 
 interface DeploymentStatusProps {
   deploymentId: string;
@@ -72,11 +73,17 @@ export function DeploymentStatusEnhanced({ deploymentId, initialStatus = 'PENDIN
   useEffect(() => {
     if (!websocketUrl) return;
 
-    const manager = new WebSocketManager(websocketUrl);
-    setWsManager(manager);
+    const initializeWebSocket = async () => {
+      try {
+        // Get authentication token
+        const authHeaders = await AuthService.getAuthHeaders();
+        const token = authHeaders.Authorization?.replace('Bearer ', '');
+        
+        const manager = new WebSocketManager(websocketUrl, token);
+        setWsManager(manager);
 
-    manager.connect()
-      .then(() => {
+        await manager.connect();
+        
         manager.subscribeToDeployment(deploymentId, (update: DeploymentStatusUpdate) => {
           setStatus(update.status);
           setStatusMessage(update.message);
@@ -100,14 +107,18 @@ export function DeploymentStatusEnhanced({ deploymentId, initialStatus = 'PENDIN
           // Update step statuses based on current deployment status
           updateStepStatuses(update.status);
         });
-      })
-      .catch(err => {
+      } catch (err) {
         console.error('Failed to connect to WebSocket:', err);
         setError('Failed to establish real-time connection');
-      });
+      }
+    };
+
+    initializeWebSocket();
 
     return () => {
-      manager.disconnect();
+      if (wsManager) {
+        wsManager.disconnect();
+      }
     };
   }, [deploymentId, websocketUrl]);
 

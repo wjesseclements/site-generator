@@ -3,6 +3,14 @@ import { DynamoDB } from 'aws-sdk'
 import { StepFunctions } from 'aws-sdk'
 import { v4 as uuidv4 } from 'uuid'
 import { Deployment, DeploymentStatus, CreateDeploymentRequest } from '../../libs/types'
+import { 
+  ErrorResponses, 
+  createSuccessResponse, 
+  logError, 
+  logInfo,
+  ValidationError,
+  UnauthorizedError
+} from '../../libs/error-handler'
 
 const dynamodb = new DynamoDB.DocumentClient()
 const stepfunctions = new StepFunctions()
@@ -12,53 +20,32 @@ const STATE_MACHINE_ARN = process.env.STATE_MACHINE_ARN!
 
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
+    logInfo('create-deployment', 'Processing deployment request', { 
+      requestId: event.requestContext.requestId 
+    })
+
     // Parse request body
-    const request: CreateDeploymentRequest = JSON.parse(event.body || '{}')
+    let request: CreateDeploymentRequest
+    try {
+      request = JSON.parse(event.body || '{}')
+    } catch (error) {
+      throw new ValidationError('Invalid JSON in request body')
+    }
     
     // Validate request
     if (!request.templateId || !request.parameters) {
-      return {
-        statusCode: 400,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          error: 'Missing required fields: templateId and parameters'
-        })
-      }
+      throw new ValidationError('Missing required fields: templateId and parameters')
     }
 
     // Validate required TestTag
     if (!request.tags?.TestTag) {
-      return {
-        statusCode: 400,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          error: 'TestTag is required for tracking and cleanup purposes'
-        })
-      }
+      throw new ValidationError('TestTag is required for tracking and cleanup purposes')
     }
 
     // Get user ID from Cognito authorizer
     const userId = event.requestContext.authorizer?.claims?.sub
     if (!userId) {
-      return {
-        statusCode: 401,
-        headers: {
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          error: 'Unauthorized: Missing authentication token'
-        })
-      }
+      throw new UnauthorizedError('Missing authentication token')
     }
     
     // Create deployment record
@@ -97,30 +84,30 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       input: JSON.stringify(deployment)
     }).promise()
 
-    return {
-      statusCode: 201,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        deployment
-      })
-    }
+    logInfo('create-deployment', 'Deployment created successfully', { 
+      deploymentId: deployment.id,
+      userId: deployment.userId,
+      templateId: deployment.templateId
+    })
+
+    return createSuccessResponse(201, { deployment })
   } catch (error) {
-    console.error('Error creating deployment:', error)
-    return {
-      statusCode: 500,
-      headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type,Authorization',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        error: 'Failed to create deployment'
-      })
+    logError('create-deployment', error, { 
+      requestId: event.requestContext.requestId,
+      userId: event.requestContext.authorizer?.claims?.sub
+    })
+    
+    // Return appropriate error response based on error type
+    if (error instanceof ValidationError) {
+      return ErrorResponses.badRequest(error.message, error.details)
     }
+    
+    if (error instanceof UnauthorizedError) {
+      return ErrorResponses.unauthorized(error.message)
+    }
+    
+    // Default to internal server error
+    return ErrorResponses.internalError('Failed to create deployment')
   }
 }
 

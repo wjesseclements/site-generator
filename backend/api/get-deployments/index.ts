@@ -1,26 +1,21 @@
 import { APIGatewayProxyHandler } from 'aws-lambda'
 import { DynamoDB } from 'aws-sdk'
+import { handleError, createErrorResponse, createSuccessResponse, logInfo, logError, AuthenticationError, DatabaseError } from '../../libs/error-handler'
 
 const dynamodb = new DynamoDB.DocumentClient()
 const DEPLOYMENTS_TABLE = process.env.DEPLOYMENTS_TABLE!
 
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
+    logInfo('Processing get-deployments request')
+    
     // Get user ID from Cognito authorizer
     const userId = event.requestContext.authorizer?.claims?.sub
     if (!userId) {
-      return {
-        statusCode: 401,
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Access-Control-Allow-Headers': 'Content-Type,Authorization'
-        },
-        body: JSON.stringify({
-          error: 'Unauthorized: Missing authentication token'
-        })
-      }
+      throw new AuthenticationError('Missing authentication token')
     }
+    
+    logInfo(`Querying deployments for user: ${userId}`)
     
     // Query deployments for user
     const result = await dynamodb.query({
@@ -33,29 +28,18 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       ScanIndexForward: false // Most recent first
     }).promise()
 
-    return {
-      statusCode: 200,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type,Authorization'
-      },
-      body: JSON.stringify({
-        deployments: result.Items || []
-      })
-    }
+    logInfo(`Found ${result.Items?.length || 0} deployments for user`)
+
+    return createSuccessResponse({
+      deployments: result.Items || []
+    })
   } catch (error) {
-    console.error('Error fetching deployments:', error)
-    return {
-      statusCode: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'Content-Type,Authorization'
-      },
-      body: JSON.stringify({
-        error: 'Failed to fetch deployments'
-      })
+    if (error instanceof AuthenticationError) {
+      logError('Authentication error in get-deployments', error)
+      return createErrorResponse(401, error.message, 'AUTHENTICATION_ERROR')
     }
+    
+    logError('Database error in get-deployments', error)
+    return handleError(error, new DatabaseError('Failed to fetch deployments'))
   }
 }

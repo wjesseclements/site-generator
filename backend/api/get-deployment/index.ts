@@ -1,41 +1,35 @@
 import { APIGatewayProxyHandler } from 'aws-lambda'
 import { DynamoDB } from 'aws-sdk'
 import { Deployment } from '../../libs/types'
+import { 
+  ErrorResponses, 
+  createSuccessResponse, 
+  logError, 
+  logInfo,
+  ValidationError,
+  UnauthorizedError,
+  NotFoundError
+} from '../../libs/error-handler'
 
 const dynamodb = new DynamoDB.DocumentClient()
 const DEPLOYMENTS_TABLE = process.env.DEPLOYMENTS_TABLE!
 
 export const handler: APIGatewayProxyHandler = async (event) => {
-  const headers = {
-    'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'Content-Type,Authorization'
-  }
-
   try {
+    logInfo('get-deployment', 'Processing get deployment request', { 
+      requestId: event.requestContext.requestId 
+    })
+
     // Get deployment ID from path parameters
     const deploymentId = event.pathParameters?.deploymentId
-    
     if (!deploymentId) {
-      return {
-        statusCode: 400,
-        headers,
-        body: JSON.stringify({
-          error: 'Deployment ID is required'
-        })
-      }
+      throw new ValidationError('Deployment ID is required')
     }
 
     // Get user ID from Cognito authorizer
     const userId = event.requestContext.authorizer?.claims?.sub
     if (!userId) {
-      return {
-        statusCode: 401,
-        headers,
-        body: JSON.stringify({
-          error: 'Unauthorized: Missing authentication token'
-        })
-      }
+      throw new UnauthorizedError('Missing authentication token')
     }
     
     // Get deployment from DynamoDB
@@ -47,43 +41,44 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     }).promise()
 
     if (!result.Item) {
-      return {
-        statusCode: 404,
-        headers,
-        body: JSON.stringify({
-          error: 'Deployment not found'
-        })
-      }
+      throw new NotFoundError('Deployment not found')
     }
 
     const deployment = result.Item as Deployment
 
     // Verify user owns this deployment
     if (deployment.userId !== userId) {
-      return {
-        statusCode: 403,
-        headers,
-        body: JSON.stringify({
-          error: 'Access denied'
-        })
-      }
+      return ErrorResponses.forbidden('Access denied to this deployment')
     }
 
-    return {
-      statusCode: 200,
-      headers,
-      body: JSON.stringify({
-        deployment
-      })
-    }
+    logInfo('get-deployment', 'Deployment retrieved successfully', { 
+      deploymentId: deployment.id,
+      userId: deployment.userId,
+      status: deployment.status
+    })
+
+    return createSuccessResponse(200, { deployment })
   } catch (error) {
-    console.error('Error getting deployment:', error)
-    return {
-      statusCode: 500,
-      headers,
-      body: JSON.stringify({
-        error: 'Failed to get deployment'
-      })
+    logError('get-deployment', error, { 
+      requestId: event.requestContext.requestId,
+      userId: event.requestContext.authorizer?.claims?.sub,
+      deploymentId: event.pathParameters?.deploymentId
+    })
+    
+    // Return appropriate error response based on error type
+    if (error instanceof ValidationError) {
+      return ErrorResponses.badRequest(error.message, error.details)
     }
+    
+    if (error instanceof UnauthorizedError) {
+      return ErrorResponses.unauthorized(error.message)
+    }
+    
+    if (error instanceof NotFoundError) {
+      return ErrorResponses.notFound(error.message)
+    }
+    
+    // Default to internal server error
+    return ErrorResponses.internalError('Failed to get deployment')
   }
 }

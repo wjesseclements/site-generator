@@ -1,6 +1,13 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult, Handler } from 'aws-lambda'
 import { DynamoDB, ApiGatewayManagementApi, StepFunctions } from 'aws-sdk'
 import * as crypto from 'crypto'
+import { 
+  createSuccessResponse, 
+  logError, 
+  logInfo,
+  ErrorResponses,
+  ValidationError
+} from '../../libs/error-handler'
 
 const dynamodb = new DynamoDB.DocumentClient()
 const stepfunctions = new StepFunctions()
@@ -14,13 +21,13 @@ const WEBSOCKET_ENDPOINT = process.env.WEBSOCKET_ENDPOINT!
 type DeploymentStatus = 'PENDING' | 'INITIALIZING' | 'PLANNING' | 'DEPLOYING' | 'COMPLETED' | 'FAILED' | 'DESTROYING' | 'DESTROYED'
 
 interface WebhookPayload {
-  deployment_id: string
+  deploymentId: string
   status: DeploymentStatus
   message: string
   step?: string
   outputs?: Record<string, any>
   error?: string
-  terraform_output?: string
+  terraformOutput?: string
 }
 
 export const handler: Handler<APIGatewayProxyEvent> = async (event): Promise<APIGatewayProxyResult> => {
@@ -75,15 +82,15 @@ export const handler: Handler<APIGatewayProxyEvent> = async (event): Promise<API
     // Parse webhook payload
     const payload: WebhookPayload = JSON.parse(event.body || '{}')
     
-    if (!payload.deployment_id || !payload.status) {
+    if (!payload.deploymentId || !payload.status) {
       return {
         statusCode: 400,
         headers,
-        body: JSON.stringify({ error: 'Missing required fields: deployment_id, status' })
+        body: JSON.stringify({ error: 'Missing required fields: deploymentId, status' })
       }
     }
     
-    console.log(`Received webhook for deployment ${payload.deployment_id}: ${payload.status}`)
+    console.log(`Received webhook for deployment ${payload.deploymentId}: ${payload.status}`)
     
     // Update deployment status in DynamoDB
     await updateDeploymentStatus(payload)
@@ -101,7 +108,7 @@ export const handler: Handler<APIGatewayProxyEvent> = async (event): Promise<API
       headers,
       body: JSON.stringify({ 
         message: 'Webhook processed successfully',
-        deploymentId: payload.deployment_id,
+        deploymentId: payload.deploymentId,
         status: payload.status
       })
     }
@@ -145,9 +152,9 @@ async function updateDeploymentStatus(payload: WebhookPayload) {
     expressionAttributeValues[':error'] = payload.error
   }
   
-  if (payload.terraform_output) {
-    updateExpression.push('terraformOutput = :terraform_output')
-    expressionAttributeValues[':terraform_output'] = payload.terraform_output
+  if (payload.terraformOutput) {
+    updateExpression.push('terraformOutput = :terraformOutput')
+    expressionAttributeValues[':terraformOutput'] = payload.terraformOutput
   }
   
   if (payload.status === 'COMPLETED') {
@@ -157,7 +164,7 @@ async function updateDeploymentStatus(payload: WebhookPayload) {
   
   await dynamodb.update({
     TableName: DEPLOYMENTS_TABLE,
-    Key: { id: payload.deployment_id },
+    Key: { id: payload.deploymentId },
     UpdateExpression: updateExpression.join(', '),
     ExpressionAttributeNames: expressionAttributeNames,
     ExpressionAttributeValues: expressionAttributeValues
@@ -188,13 +195,13 @@ async function notifyConnections(payload: WebhookPayload) {
         await apigwManagementApi.postToConnection({
           ConnectionId: connectionId,
           Data: JSON.stringify({
-            deploymentId: payload.deployment_id,
+            deploymentId: payload.deploymentId,
             status: payload.status,
             message: payload.message,
             step: payload.step,
             outputs: payload.outputs,
             error: payload.error,
-            terraform_output: payload.terraform_output?.substring(0, 1000) // Truncate for WebSocket
+            terraformOutput: payload.terraformOutput?.substring(0, 1000) // Truncate for WebSocket
           })
         }).promise()
       } catch (error: any) {
@@ -222,48 +229,48 @@ async function handleStepFunctionsCallback(payload: WebhookPayload) {
     // Get correlation data for this deployment
     const correlationResult = await dynamodb.get({
       TableName: CORRELATION_TABLE,
-      Key: { deploymentId: payload.deployment_id }
+      Key: { deploymentId: payload.deploymentId }
     }).promise()
     
     if (!correlationResult.Item) {
-      console.log(`No correlation data found for deployment ${payload.deployment_id}`)
+      console.log(`No correlation data found for deployment ${payload.deploymentId}`)
       return
     }
     
     const { taskToken } = correlationResult.Item
-    console.log(`Found correlation data for deployment ${payload.deployment_id}`)
+    console.log(`Found correlation data for deployment ${payload.deploymentId}`)
     
     // Send success or failure to Step Functions
     if (payload.status === 'COMPLETED') {
       await stepfunctions.sendTaskSuccess({
         taskToken: taskToken,
         output: JSON.stringify({
-          deployment_id: payload.deployment_id,
+          deploymentId: payload.deploymentId,
           status: payload.status,
           message: payload.message,
           outputs: payload.outputs,
-          terraform_output: payload.terraform_output
+          terraformOutput: payload.terraformOutput
         })
       }).promise()
-      console.log(`Sent task success to Step Functions for deployment ${payload.deployment_id}`)
+      console.log(`Sent task success to Step Functions for deployment ${payload.deploymentId}`)
     } else if (payload.status === 'FAILED') {
       await stepfunctions.sendTaskFailure({
         taskToken: taskToken,
         error: 'DeploymentFailed',
         cause: payload.error || payload.message || 'GitHub Actions deployment failed'
       }).promise()
-      console.log(`Sent task failure to Step Functions for deployment ${payload.deployment_id}`)
+      console.log(`Sent task failure to Step Functions for deployment ${payload.deploymentId}`)
     }
     
     // Clean up correlation data
     await dynamodb.delete({
       TableName: CORRELATION_TABLE,
-      Key: { deploymentId: payload.deployment_id }
+      Key: { deploymentId: payload.deploymentId }
     }).promise()
-    console.log(`Cleaned up correlation data for deployment ${payload.deployment_id}`)
+    console.log(`Cleaned up correlation data for deployment ${payload.deploymentId}`)
     
   } catch (error) {
-    console.error(`Error handling Step Functions callback for deployment ${payload.deployment_id}:`, error)
+    console.error(`Error handling Step Functions callback for deployment ${payload.deploymentId}:`, error)
     // Don't fail the webhook if Step Functions callback fails
   }
 }

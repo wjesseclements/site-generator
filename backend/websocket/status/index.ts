@@ -1,5 +1,6 @@
 import { APIGatewayProxyHandler } from 'aws-lambda'
 import { DynamoDB, ApiGatewayManagementApi } from 'aws-sdk'
+import { handleError, createWebSocketResponse, logInfo, logError, ValidationError, DatabaseError, NotFoundError } from '../../libs/error-handler'
 
 const dynamodb = new DynamoDB.DocumentClient()
 const CONNECTIONS_TABLE = process.env.CONNECTIONS_TABLE!
@@ -10,13 +11,10 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     const { deploymentId } = JSON.parse(event.body || '{}')
     const connectionId = event.requestContext.connectionId!
     
+    logInfo(`Processing WebSocket status request for deployment: ${deploymentId}`)
+    
     if (!deploymentId) {
-      return {
-        statusCode: 400,
-        body: JSON.stringify({
-          error: 'Deployment ID is required'
-        })
-      }
+      throw new ValidationError('Deployment ID is required')
     }
 
     // Get deployment status
@@ -28,12 +26,7 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     }).promise()
 
     if (!result.Item) {
-      return {
-        statusCode: 404,
-        body: JSON.stringify({
-          error: 'Deployment not found'
-        })
-      }
+      throw new NotFoundError('Deployment not found')
     }
 
     // Create API Gateway Management API client
@@ -41,6 +34,8 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       apiVersion: '2018-11-29',
       endpoint: `${event.requestContext.domainName}/${event.requestContext.stage}`
     })
+
+    logInfo(`Sending deployment status to connection: ${connectionId}`)
 
     // Send deployment status to connection
     await apigwManagementApi.postToConnection({
@@ -51,19 +46,23 @@ export const handler: APIGatewayProxyHandler = async (event) => {
       })
     }).promise()
 
-    return {
-      statusCode: 200,
-      body: JSON.stringify({
-        message: 'Status sent successfully'
-      })
-    }
+    logInfo(`Successfully sent status for deployment: ${deploymentId}`)
+
+    return createWebSocketResponse(200, {
+      message: 'Status sent successfully'
+    })
   } catch (error) {
-    console.error('Error sending status:', error)
-    return {
-      statusCode: 500,
-      body: JSON.stringify({
-        error: 'Failed to send status'
-      })
+    if (error instanceof ValidationError) {
+      logError('Validation error in WebSocket status', error)
+      return createWebSocketResponse(400, { error: error.message })
     }
+    
+    if (error instanceof NotFoundError) {
+      logError('Deployment not found in WebSocket status', error)
+      return createWebSocketResponse(404, { error: error.message })
+    }
+    
+    logError('Error sending WebSocket status', error)
+    return handleError(error, new DatabaseError('Failed to send status'))
   }
 }
