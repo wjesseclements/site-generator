@@ -27,7 +27,16 @@ export const handler: APIGatewayProxyHandler = async (event) => {
     }
 
     // Get user ID from Cognito authorizer
-    const userId = event.requestContext.authorizer?.claims?.sub || 'test-user'
+    const userId = event.requestContext.authorizer?.claims?.sub
+    if (!userId) {
+      return {
+        statusCode: 401,
+        headers,
+        body: JSON.stringify({
+          error: 'Unauthorized: Missing authentication token'
+        })
+      }
+    }
     
     // Get deployment from DynamoDB
     const result = await dynamodb.get({

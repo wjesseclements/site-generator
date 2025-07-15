@@ -1,25 +1,7 @@
 import { Handler } from 'aws-lambda'
 import { DynamoDB } from 'aws-sdk'
 import fetch from 'node-fetch'
-
-// Inline types
-interface Deployment {
-  id: string
-  userId: string
-  templateId: string
-  templateName: string
-  siteName: string
-  parameters: Record<string, any>
-  status: string
-  targetAccount?: string
-  createdAt: string
-  updatedAt: string
-  tags: Record<string, string>
-  createdBy?: string
-  name?: string
-}
-
-type DeploymentStatus = 'PENDING' | 'INITIALIZING' | 'PLANNING' | 'DEPLOYING' | 'COMPLETED' | 'FAILED' | 'DESTROYING' | 'DESTROYED'
+import { Deployment, DeploymentStatus } from '../../libs/types'
 
 const dynamodb = new DynamoDB.DocumentClient()
 
@@ -39,6 +21,23 @@ interface GitHubDispatchEvent {
 
 export const handler: Handler<GitHubDispatchEvent> = async (event) => {
   const { TaskToken, deployment, action } = event
+  
+  // Input validation
+  if (!deployment) {
+    throw new Error('Missing required parameter: deployment')
+  }
+  
+  if (!action || !['deploy', 'destroy'].includes(action)) {
+    throw new Error('Invalid action parameter: must be "deploy" or "destroy"')
+  }
+  
+  // Validate deployment object has required fields
+  const requiredFields = ['id', 'userId', 'templateId', 'siteName', 'parameters', 'createdAt', 'tags']
+  for (const field of requiredFields) {
+    if (!deployment[field]) {
+      throw new Error(`Missing required deployment field: ${field}`)
+    }
+  }
   
   try {
     // Update deployment status to indicate GitHub Actions is being triggered

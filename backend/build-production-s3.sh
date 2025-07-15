@@ -33,7 +33,7 @@ while IFS= read -r -d '' func_path; do
   # Remove /index.ts suffix to get directory path  
   func_dir=${rel_path%/index.ts}
   FUNCTIONS+=("$func_dir")
-done < <(find "$BACKEND_DIR" -name "index.ts" -not -path "*/node_modules/*" -not -path "*/terraform-runner/*" -print0)
+done < <(find "$BACKEND_DIR" -name "index.ts" -not -path "*/node_modules/*" -print0)
 
 echo -e "${BLUE}📍 Discovered functions: ${FUNCTIONS[*]}${NC}"
 

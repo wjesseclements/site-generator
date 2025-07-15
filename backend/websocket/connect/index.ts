@@ -7,7 +7,15 @@ const CONNECTIONS_TABLE = process.env.CONNECTIONS_TABLE!
 export const handler: APIGatewayProxyHandler = async (event) => {
   try {
     const connectionId = event.requestContext.connectionId!
-    const userId = event.requestContext.authorizer?.principalId || 'anonymous'
+    const userId = event.requestContext.authorizer?.principalId
+    if (!userId) {
+      return {
+        statusCode: 401,
+        body: JSON.stringify({
+          error: 'Unauthorized: Missing authentication'
+        })
+      }
+    }
     
     // Store connection in DynamoDB
     await dynamodb.put({
