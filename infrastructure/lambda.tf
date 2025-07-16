@@ -147,14 +147,14 @@ module "github_dispatch_lambda" {
   code_signing_config_arn = var.enable_code_signing ? aws_lambda_code_signing_config.this[0].arn : null
 
   environment_variables = {
-    DEPLOYMENTS_TABLE  = aws_dynamodb_table.deployments.name
-    CORRELATION_TABLE  = aws_dynamodb_table.deployment_correlation.name
-    GITHUB_TOKEN       = var.github_token
-    GITHUB_REPO_OWNER  = var.github_repo_owner
-    GITHUB_REPO_NAME   = var.github_repo_name
-    WEBHOOK_ENDPOINT   = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}/github-webhook"
-    ENVIRONMENT        = var.environment
-    LOG_LEVEL          = var.lambda_log_level
+    DEPLOYMENTS_TABLE       = aws_dynamodb_table.deployments.name
+    CORRELATION_TABLE       = aws_dynamodb_table.deployment_correlation.name
+    GITHUB_TOKEN_SECRET_ARN = aws_secretsmanager_secret.github_token.arn
+    GITHUB_REPO_OWNER       = var.github_repo_owner
+    GITHUB_REPO_NAME        = var.github_repo_name
+    WEBHOOK_ENDPOINT        = "https://${aws_api_gateway_rest_api.main.id}.execute-api.${data.aws_region.current.name}.amazonaws.com/${var.environment}/github-webhook"
+    ENVIRONMENT             = var.environment
+    LOG_LEVEL               = var.lambda_log_level
   }
 
   tags = local.common_tags

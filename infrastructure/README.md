@@ -12,6 +12,7 @@ This directory contains the Terraform configuration for the Site Generator Platf
 - **Cognito**: User authentication
 - **IAM**: Roles and policies
 - **Step Functions**: Deployment orchestration
+- **Secrets Manager**: Secure GitHub token storage
 
 ## Directory Structure
 
@@ -28,6 +29,7 @@ infrastructure/
 ├── cognito.tf          # Cognito user pool
 ├── iam.tf              # IAM roles and policies
 ├── step-functions.tf   # Step Functions
+├── secrets.tf          # AWS Secrets Manager
 └── modules/            # Reusable modules
     └── lambda-function/
 ```
@@ -62,3 +64,31 @@ Set these before running Terraform:
 export AWS_REGION=us-east-1
 export TF_VAR_environment=dev
 ```
+
+## Secrets Management
+
+### GitHub Token Setup
+
+The platform uses AWS Secrets Manager to securely store the GitHub personal access token. Follow these steps:
+
+1. **Initial Deployment**: Add the token to `terraform.tfvars` for the first deployment:
+   ```hcl
+   github_token = "ghp_your_generated_token_here"
+   ```
+
+2. **After Deployment**: Remove the token from `terraform.tfvars` and manage it through Secrets Manager:
+   ```bash
+   # Update the secret value
+   aws secretsmanager put-secret-value \
+     --secret-id site-generator-dev-github-token \
+     --secret-string '{"token":"ghp_your_token_here","repository":"wjesseclements/site-generator-infrastructure","created_at":"2025-01-01T00:00:00Z"}'
+   ```
+
+3. **Token Rotation**: Update the secret in Secrets Manager without redeploying infrastructure.
+
+### Security Features
+
+- Token is encrypted at rest in AWS Secrets Manager
+- Lambda functions cache tokens for 5 minutes to reduce API calls
+- IAM permissions follow principle of least privilege
+- CloudTrail logs all secret access for auditing

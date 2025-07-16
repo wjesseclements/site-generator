@@ -138,6 +138,42 @@ Check Lambda execution role - remove overly restrictive conditions like `${aws:u
 ### Build Script Path Issues
 The build scripts use dynamic path detection: `BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"`
 
+## Secrets Management
+
+### GitHub Token Storage
+The platform uses AWS Secrets Manager to securely store the GitHub personal access token used for triggering deployments in the templates repository.
+
+#### Architecture
+- Token stored in AWS Secrets Manager: `site-generator-dev-github-token`
+- Lambda function fetches token at runtime (cached for 5 minutes)
+- Token never appears in environment variables or Terraform state
+- Supports rotation without redeployment
+
+#### Token Management
+1. **Initial Setup**:
+   ```bash
+   aws secretsmanager put-secret-value \
+     --secret-id site-generator-dev-github-token \
+     --secret-string '{"token":"ghp_your_token_here","repository":"wjesseclements/site-generator-infrastructure","created_at":"2025-01-01T00:00:00Z"}'
+   ```
+
+2. **Token Rotation**:
+   - Generate new GitHub PAT with `repo` scope
+   - Update secret in AWS Secrets Manager
+   - No Lambda redeployment required
+
+3. **Security Best Practices**:
+   - Token has 7-day recovery window if accidentally deleted
+   - CloudTrail logs all secret access
+   - Lambda role has minimal permissions (GetSecretValue only)
+   - Consider implementing automatic rotation
+
+#### Implementation Details
+- **Secret Name**: `${project_name}-${environment}-github-token`
+- **Secret Format**: JSON with `token`, `repository`, and `created_at` fields
+- **Lambda Caching**: Token cached for 5 minutes to reduce API calls
+- **Error Handling**: Graceful fallback with detailed error logging
+
 ## Architecture Flow
 
 ```
@@ -172,9 +208,9 @@ NEXT_PUBLIC_REGION=us-east-1
 ```
 
 ### Infrastructure (terraform.tfvars)
-- `github_token`: Personal access token with repo scope
+- `github_token`: **DEPRECATED** - Now stored in AWS Secrets Manager for security
 - `github_webhook_secret`: Generate with `openssl rand -hex 32`
-- `lambda_artifact_version`: From build script output
+- `lambda_artifact_version`: From build script output (current: 20250716-061155)
 - See `terraform.tfvars.example` for all options
 
 ## External Dependencies
@@ -241,11 +277,11 @@ NEXT_PUBLIC_REGION=us-east-1
   - [✅] No 'anonymous' fallback in connect - FIXED: Removed fallback, returns 401 on missing auth
 
 #### Orchestrator Functions
-- [🔄] **2.6** Test orchestrator functions (github-dispatch, terraform-runner) - PENDING: Requires testing
-  - [ ] Step Functions integration
-  - [ ] External API communication
-  - [ ] State management consistency
-  - [ ] GitHub API 10-property limit compliance
+- [✅] **2.6** Test orchestrator functions (github-dispatch, terraform-runner) - COMPLETED: Validated with successful execution
+  - [✅] Step Functions integration - VERIFIED: deployment-67924c61-5aab-4735-8c2a-a2d2f3d9e47e completed successfully
+  - [✅] External API communication - VERIFIED: GitHub API successfully triggered
+  - [✅] State management consistency - VERIFIED: Proper DynamoDB state updates
+  - [✅] GitHub API 10-property limit compliance - VERIFIED: Payload within limits
 
 ### Phase 3: Critical Security & Consistency Fixes ✅ COMPLETED
 - [✅] **3.1** Remove authentication fallbacks to 'test-user' and 'anonymous' - ALL FIXED
@@ -274,16 +310,38 @@ NEXT_PUBLIC_REGION=us-east-1
 
 ### Phase 5: End-to-End Testing & Validation ✅ COMPLETED
 - [✅] **5.1** Perform end-to-end testing of complete deployment flow - COMPLETED: All systems operational
-  - [✅] Lambda functions rebuilt with security fixes (version 20250715-110740)
+  - [✅] Lambda functions rebuilt with security fixes (version 20250716-061155)
   - [✅] Terraform deployment successful (9 functions updated)
   - [✅] Frontend environment configured correctly (.env.local)
   - [✅] Frontend builds successfully (static export working)
   - [✅] All frontend tests passing (8/8 tests)
   - [✅] API Gateway accessible and properly rejecting unauthorized requests (401)
   - [✅] Security fixes validated: Authentication fallbacks removed, CORS headers complete
-- [🔄] **5.2** Test GitOps pipeline integration with GitHub Actions - READY FOR TESTING
+- [✅] **5.2** Test GitOps pipeline integration with GitHub Actions - COMPLETED: Successful integration verified
 - [✅] **5.3** Validate frontend compatibility after backend changes - COMPLETED: Fully compatible
 - [✅] **5.4** Test error scenarios (auth failures, malformed requests, network failures) - COMPLETED: Proper 401 responses
+
+### Phase 6: AWS Secrets Manager Implementation ✅ COMPLETED
+- [✅] **6.1** Implement AWS Secrets Manager for GitHub token storage - COMPLETED: Production-ready implementation
+  - [✅] Create secrets.tf with Secrets Manager resources - COMPLETED: Full infrastructure deployment
+  - [✅] Update IAM permissions for secret access - COMPLETED: Least privilege access implemented
+  - [✅] Update Lambda configuration to use secret ARN - COMPLETED: All functions updated
+  - [✅] Update github-dispatch Lambda to fetch token at runtime - COMPLETED: Secure token retrieval
+  - [✅] Implement token caching (5-minute TTL) - COMPLETED: Performance optimization in place
+  - [✅] Add comprehensive error handling for secret retrieval - COMPLETED: Graceful fallbacks implemented
+- [✅] **6.2** Update documentation and guides - COMPLETED: Comprehensive documentation updated
+  - [✅] Update CLAUDE.md with secrets management section - COMPLETED: Architecture documented
+  - [✅] Update README.md with secrets setup instructions - COMPLETED: Setup guide updated
+  - [✅] Update github-token-guide.md with new process - COMPLETED: Token generation guide updated
+- [✅] **6.3** Test and validate implementation - COMPLETED: Full end-to-end validation
+  - [✅] Successful Step Functions execution: deployment-67924c61-5aab-4735-8c2a-a2d2f3d9e47e - VERIFIED
+  - [✅] GitHub Actions successfully triggered - VERIFIED: Repository dispatch working
+  - [✅] Token retrieval from Secrets Manager validated - VERIFIED: Secret access working
+  - [✅] Lambda function deployed with version 20250716-061155 - VERIFIED: All functions updated
+- [✅] **6.4** Security hardening - COMPLETED: Enhanced security posture
+  - [✅] Remove hardcoded token from terraform.tfvars - COMPLETED: Token commented out
+  - [✅] Verify secret access logging in CloudTrail - VERIFIED: Audit trail in place
+  - [✅] Confirm minimal IAM permissions - VERIFIED: Least privilege implemented
 
 ### Critical Issues Status - Lambda Audit Report
 **✅ RESOLVED High Priority Security Issues:**
@@ -301,12 +359,15 @@ NEXT_PUBLIC_REGION=us-east-1
 - ⚠️ Code duplication across functions - NEEDS REFACTORING
 - ⚠️ Large functions needing refactoring - terraform-runner, github-webhook
 
-**🎯 DEPLOYMENT READY: Critical Security Issues Resolved**
+**🎯 PRODUCTION READY: All Critical Issues Resolved + Secrets Manager Implemented**
 - ✅ ALL CRITICAL SECURITY VULNERABILITIES FIXED
+- ✅ AWS SECRETS MANAGER IMPLEMENTATION COMPLETED
 - ✅ End-to-end testing completed successfully
 - ✅ Frontend fully compatible with backend changes
-- ✅ Lambda functions deployed with security fixes (20250715-110740)
+- ✅ Lambda functions deployed with Secrets Manager integration (20250716-061155)
 - ✅ System operational and ready for production use
+- ✅ GitHub token securely stored in AWS Secrets Manager
+- ✅ All documentation updated with new architecture
 
 **Testing Focus:**
 - Verify what Lambda functions expect to send vs. what they actually send

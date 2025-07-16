@@ -304,6 +304,25 @@ resource "aws_iam_role_policy" "github_dispatch_dynamodb" {
   })
 }
 
+# GitHub dispatch Lambda Secrets Manager access policy
+resource "aws_iam_role_policy" "github_dispatch_secrets" {
+  name = "${local.resource_prefix}-github-dispatch-secrets"
+  role = aws_iam_role.github_dispatch_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
+        ]
+        Resource = aws_secretsmanager_secret.github_token.arn
+      }
+    ]
+  })
+}
 
 # API Gateway CloudWatch role
 resource "aws_iam_role" "api_gateway_cloudwatch" {

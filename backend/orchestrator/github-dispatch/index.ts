@@ -1,17 +1,51 @@
 import { Handler } from 'aws-lambda'
-import { DynamoDB } from 'aws-sdk'
+import { DynamoDB, SecretsManager } from 'aws-sdk'
 import fetch from 'node-fetch'
 import { Deployment, DeploymentStatus } from '../../libs/types'
 
 const dynamodb = new DynamoDB.DocumentClient()
+const secretsManager = new SecretsManager()
 
 const DEPLOYMENTS_TABLE = process.env.DEPLOYMENTS_TABLE!
 const CORRELATION_TABLE = process.env.CORRELATION_TABLE!
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN!
+const GITHUB_TOKEN_SECRET_ARN = process.env.GITHUB_TOKEN_SECRET_ARN!
 const GITHUB_REPO_OWNER = process.env.GITHUB_REPO_OWNER!
 const GITHUB_REPO_NAME = process.env.GITHUB_REPO_NAME!
 const WEBHOOK_ENDPOINT = process.env.WEBHOOK_ENDPOINT!
 const ENVIRONMENT = process.env.ENVIRONMENT!
+
+// Cache token for Lambda container reuse
+let cachedToken: string | null = null
+let tokenExpiry: number = 0
+
+async function getGitHubToken(): Promise<string> {
+  const now = Date.now()
+  
+  // Return cached token if still valid (cache for 5 minutes)
+  if (cachedToken && tokenExpiry > now) {
+    return cachedToken
+  }
+  
+  try {
+    const result = await secretsManager.getSecretValue({
+      SecretId: GITHUB_TOKEN_SECRET_ARN
+    }).promise()
+    
+    if (!result.SecretString) {
+      throw new Error('Secret value is empty')
+    }
+    
+    const secret = JSON.parse(result.SecretString)
+    cachedToken = secret.token
+    tokenExpiry = now + (5 * 60 * 1000) // 5 minutes
+    
+    console.log('Successfully retrieved GitHub token from Secrets Manager')
+    return cachedToken
+  } catch (error) {
+    console.error('Failed to retrieve GitHub token from Secrets Manager:', error)
+    throw new Error('Unable to authenticate with GitHub')
+  }
+}
 
 interface GitHubDispatchEvent {
   TaskToken?: string
@@ -42,6 +76,9 @@ export const handler: Handler<GitHubDispatchEvent> = async (event) => {
   try {
     // Update deployment status to indicate GitHub Actions is being triggered
     await updateDeploymentStatus(deployment.id, 'INITIALIZING', `Triggering GitHub Actions for ${action}`)
+    
+    // Get GitHub token from Secrets Manager
+    const GITHUB_TOKEN = await getGitHubToken()
     
     // Prepare GitHub repository dispatch payload (max 10 properties)
     const dispatchPayload = {
