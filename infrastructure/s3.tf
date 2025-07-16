@@ -68,6 +68,75 @@ resource "aws_s3_bucket_versioning" "lambda_deployments" {
   }
 }
 
+# AWS Best Practice: Server-side encryption for Lambda artifacts
+resource "aws_s3_bucket_server_side_encryption_configuration" "lambda_deployments" {
+  bucket = aws_s3_bucket.lambda_deployments.id
+
+  rule {
+    apply_server_side_encryption_by_default {
+      sse_algorithm = "AES256"
+    }
+    bucket_key_enabled = true
+  }
+}
+
+# AWS Best Practice: Block public access for Lambda artifacts
+resource "aws_s3_bucket_public_access_block" "lambda_deployments" {
+  bucket = aws_s3_bucket.lambda_deployments.id
+
+  block_public_acls       = true
+  block_public_policy     = true
+  ignore_public_acls      = true
+  restrict_public_buckets = true
+}
+
+# AWS Best Practice: Intelligent tiering for cost optimization
+resource "aws_s3_bucket_intelligent_tiering_configuration" "lambda_deployments" {
+  bucket = aws_s3_bucket.lambda_deployments.id
+  name   = "lambda-artifacts-tiering"
+
+  status = "Enabled"
+
+  # Archive access tier after 90 days
+  tiering {
+    access_tier = "ARCHIVE_ACCESS"
+    days        = 90
+  }
+
+  # Deep archive after 180 days
+  tiering {
+    access_tier = "DEEP_ARCHIVE_ACCESS"
+    days        = 180
+  }
+}
+
+# AWS Best Practice: Lifecycle management for old versions
+resource "aws_s3_bucket_lifecycle_configuration" "lambda_deployments" {
+  bucket = aws_s3_bucket.lambda_deployments.id
+
+  rule {
+    id     = "lambda_artifact_lifecycle"
+    status = "Enabled"
+
+    # Apply to all objects
+    filter {
+      prefix = ""
+    }
+
+    # Remove old versions after 30 days
+    noncurrent_version_expiration {
+      noncurrent_days = 30
+    }
+
+    # Clean up incomplete multipart uploads
+    abort_incomplete_multipart_upload {
+      days_after_initiation = 7
+    }
+  }
+
+  depends_on = [aws_s3_bucket_versioning.lambda_deployments]
+}
+
 # S3 bucket for Terraform state files (for deployed sites)
 resource "aws_s3_bucket" "terraform_states" {
   bucket = "${local.resource_prefix}-terraform-states"

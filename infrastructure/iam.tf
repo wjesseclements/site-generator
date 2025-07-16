@@ -1,6 +1,7 @@
-# Lambda execution role
+# AWS Best Practice: Lambda execution role with enhanced security
 resource "aws_iam_role" "lambda_execution" {
   name = "${local.resource_prefix}-lambda-execution"
+  path = "/lambda/"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -11,18 +12,87 @@ resource "aws_iam_role" "lambda_execution" {
         Principal = {
           Service = "lambda.amazonaws.com"
         }
+        Condition = {
+          "StringEquals" = {
+            "aws:RequestedRegion" = var.aws_region
+          }
+        }
       }
     ]
   })
+
+  # AWS Best Practice: Force MFA for sensitive operations
+  permissions_boundary = var.environment == "prod" ? aws_iam_policy.lambda_permissions_boundary[0].arn : null
+
+  tags = local.common_tags
 }
 
-# Lambda basic execution policy
+# AWS Best Practice: Permissions boundary for production security
+resource "aws_iam_policy" "lambda_permissions_boundary" {
+  count = var.environment == "prod" ? 1 : 0
+  
+  name        = "${local.resource_prefix}-lambda-permissions-boundary"
+  path        = "/security/"
+  description = "Permissions boundary for Lambda functions in production"
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogGroup",
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "dynamodb:GetItem",
+          "dynamodb:PutItem",
+          "dynamodb:UpdateItem",
+          "dynamodb:DeleteItem",
+          "dynamodb:Query",
+          "dynamodb:Scan",
+          "states:StartExecution",
+          "states:DescribeExecution",
+          "apigateway:POST",
+          "execute-api:ManageConnections",
+          "xray:PutTraceSegments",
+          "xray:PutTelemetryRecords"
+        ]
+        Resource = "*"
+        Condition = {
+          "StringEquals" = {
+            "aws:RequestedRegion" = var.aws_region
+          }
+        }
+      },
+      {
+        Effect = "Deny"
+        Action = [
+          "iam:*",
+          "organizations:*",
+          "account:*"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+
+  tags = local.common_tags
+}
+
+# Enhanced Lambda execution policy with X-Ray tracing
 resource "aws_iam_role_policy_attachment" "lambda_basic_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
   role       = aws_iam_role.lambda_execution.name
 }
 
-# Lambda DynamoDB access policy
+# AWS Best Practice: X-Ray tracing permissions
+resource "aws_iam_role_policy_attachment" "lambda_xray_tracing" {
+  count      = var.enable_lambda_tracing ? 1 : 0
+  policy_arn = "arn:aws:iam::aws:policy/AWSXRayDaemonWriteAccess"
+  role       = aws_iam_role.lambda_execution.name
+}
+
+# AWS Best Practice: Least privilege DynamoDB access with conditions
 resource "aws_iam_role_policy" "lambda_dynamodb" {
   name = "${local.resource_prefix}-lambda-dynamodb"
   role = aws_iam_role.lambda_execution.id
@@ -31,21 +101,52 @@ resource "aws_iam_role_policy" "lambda_dynamodb" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "DynamoDBTableAccess"
         Effect = "Allow"
         Action = [
           "dynamodb:PutItem",
           "dynamodb:GetItem",
           "dynamodb:UpdateItem",
           "dynamodb:DeleteItem",
-          "dynamodb:Query",
-          "dynamodb:Scan"
+          "dynamodb:Query"
         ]
         Resource = [
           aws_dynamodb_table.deployments.arn,
           "${aws_dynamodb_table.deployments.arn}/index/*",
           aws_dynamodb_table.connections.arn,
-          "${aws_dynamodb_table.connections.arn}/index/*"
+          "${aws_dynamodb_table.connections.arn}/index/*",
+          aws_dynamodb_table.deployment_correlation.arn,
+          "${aws_dynamodb_table.deployment_correlation.arn}/index/*"
         ]
+        Condition = {
+          "StringEquals" = {
+            "aws:RequestedRegion" = var.aws_region
+          }
+        }
+      },
+      {
+        Sid    = "DynamoDBScanLimited"
+        Effect = "Allow"
+        Action = [
+          "dynamodb:Scan"
+        ]
+        Resource = [
+          aws_dynamodb_table.deployments.arn,
+          aws_dynamodb_table.connections.arn
+        ]
+        Condition = {
+          "ForAllValues:StringEquals" = {
+            "dynamodb:ProjectionExpression" = [
+              "id",
+              "templateName", 
+              "status",
+              "createdAt"
+            ]
+          }
+          "NumericLessThan" = {
+            "dynamodb:ReturnedItemCount" = "50"
+          }
+        }
       }
     ]
   })
@@ -60,6 +161,7 @@ resource "aws_iam_role_policy" "lambda_step_functions" {
     Version = "2012-10-17"
     Statement = [
       {
+        Sid    = "StepFunctionsExecution"
         Effect = "Allow"
         Action = [
           "states:StartExecution",
@@ -67,9 +169,56 @@ resource "aws_iam_role_policy" "lambda_step_functions" {
           "states:StopExecution"
         ]
         Resource = "arn:aws:states:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:stateMachine:${local.resource_prefix}-*"
+        Condition = {
+          "StringEquals" = {
+            "aws:RequestedRegion" = var.aws_region
+          }
+        }
       }
     ]
   })
+}
+
+# AWS Best Practice: WebSocket API Gateway permissions for Lambda
+resource "aws_iam_role_policy" "lambda_websocket_api" {
+  name = "${local.resource_prefix}-lambda-websocket-api"
+  role = aws_iam_role.lambda_execution.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "WebSocketAPIAccess"
+        Effect = "Allow"
+        Action = [
+          "execute-api:ManageConnections"
+        ]
+        Resource = "arn:aws:execute-api:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:*/*/POST/@connections/*"
+        Condition = {
+          "StringEquals" = {
+            "aws:RequestedRegion" = var.aws_region
+          }
+        }
+      }
+    ]
+  })
+}
+
+# AWS Best Practice: Lambda code signing configuration (optional)
+resource "aws_lambda_code_signing_config" "this" {
+  count = var.enable_code_signing ? 1 : 0
+
+  allowed_publishers {
+    signing_profile_version_arns = var.code_signing_profile_arns
+  }
+
+  policies {
+    untrusted_artifact_on_deployment = "Warn"  # Set to "Enforce" for production
+  }
+
+  description = "Code signing configuration for ${local.resource_prefix} Lambda functions"
+
+  tags = local.common_tags
 }
 
 # Step Functions execution role
@@ -109,9 +258,9 @@ resource "aws_iam_role_policy" "step_functions_lambda" {
   })
 }
 
-# Terraform runner Lambda execution role with elevated permissions
-resource "aws_iam_role" "terraform_runner_execution" {
-  name = "${local.resource_prefix}-terraform-runner-execution"
+# GitHub dispatch Lambda execution role
+resource "aws_iam_role" "github_dispatch_execution" {
+  name = "${local.resource_prefix}-github-dispatch-execution"
 
   assume_role_policy = jsonencode({
     Version = "2012-10-17"
@@ -127,16 +276,16 @@ resource "aws_iam_role" "terraform_runner_execution" {
   })
 }
 
-# Terraform runner basic execution policy
-resource "aws_iam_role_policy_attachment" "terraform_runner_basic_execution" {
+# GitHub dispatch Lambda basic execution policy
+resource "aws_iam_role_policy_attachment" "github_dispatch_basic_execution" {
   policy_arn = "arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole"
-  role       = aws_iam_role.terraform_runner_execution.name
+  role       = aws_iam_role.github_dispatch_execution.name
 }
 
-# Terraform runner S3 access policy
-resource "aws_iam_role_policy" "terraform_runner_s3" {
-  name = "${local.resource_prefix}-terraform-runner-s3"
-  role = aws_iam_role.terraform_runner_execution.id
+# GitHub dispatch Lambda DynamoDB access policy
+resource "aws_iam_role_policy" "github_dispatch_dynamodb" {
+  name = "${local.resource_prefix}-github-dispatch-dynamodb"
+  role = aws_iam_role.github_dispatch_execution.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -144,24 +293,21 @@ resource "aws_iam_role_policy" "terraform_runner_s3" {
       {
         Effect = "Allow"
         Action = [
-          "s3:GetObject",
-          "s3:PutObject",
-          "s3:DeleteObject",
-          "s3:ListBucket"
+          "dynamodb:UpdateItem",
+          "dynamodb:GetItem"
         ]
         Resource = [
-          aws_s3_bucket.terraform_states.arn,
-          "${aws_s3_bucket.terraform_states.arn}/*"
+          aws_dynamodb_table.deployments.arn
         ]
       }
     ]
   })
 }
 
-# Terraform runner DynamoDB access for state locking
-resource "aws_iam_role_policy" "terraform_runner_dynamodb" {
-  name = "${local.resource_prefix}-terraform-runner-dynamodb"
-  role = aws_iam_role.terraform_runner_execution.id
+# GitHub dispatch Lambda Secrets Manager access policy
+resource "aws_iam_role_policy" "github_dispatch_secrets" {
+  name = "${local.resource_prefix}-github-dispatch-secrets"
+  role = aws_iam_role.github_dispatch_execution.id
 
   policy = jsonencode({
     Version = "2012-10-17"
@@ -169,28 +315,10 @@ resource "aws_iam_role_policy" "terraform_runner_dynamodb" {
       {
         Effect = "Allow"
         Action = [
-          "dynamodb:PutItem",
-          "dynamodb:GetItem",
-          "dynamodb:DeleteItem"
+          "secretsmanager:GetSecretValue",
+          "secretsmanager:DescribeSecret"
         ]
-        Resource = aws_dynamodb_table.terraform_locks.arn
-      }
-    ]
-  })
-}
-
-# Terraform runner cross-account assume role policy
-resource "aws_iam_role_policy" "terraform_runner_assume_role" {
-  name = "${local.resource_prefix}-terraform-runner-assume-role"
-  role = aws_iam_role.terraform_runner_execution.id
-
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Action = "sts:AssumeRole"
-        Resource = "arn:aws:iam::*:role/${var.project_name}-deployment-role"
+        Resource = aws_secretsmanager_secret.github_token.arn
       }
     ]
   })

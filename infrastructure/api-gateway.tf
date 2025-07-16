@@ -30,6 +30,13 @@ resource "aws_api_gateway_resource" "deployment" {
   path_part   = "{deploymentId}"
 }
 
+# GitHub webhook resource
+resource "aws_api_gateway_resource" "github_webhook" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  parent_id   = aws_api_gateway_rest_api.main.root_resource_id
+  path_part   = "github-webhook"
+}
+
 # CORS configuration
 resource "aws_api_gateway_method" "deployments_options" {
   rest_api_id   = aws_api_gateway_rest_api.main.id
@@ -160,6 +167,81 @@ resource "aws_lambda_permission" "api_gateway_get_deployment" {
   source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
 }
 
+# POST /github-webhook (no authentication required for GitHub webhooks)
+resource "aws_api_gateway_method" "github_webhook" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.github_webhook.id
+  http_method   = "POST"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "github_webhook" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.github_webhook.id
+  http_method = aws_api_gateway_method.github_webhook.http_method
+
+  integration_http_method = "POST"
+  type                    = "AWS_PROXY"
+  uri                     = module.github_webhook_lambda.invoke_arn
+}
+
+resource "aws_lambda_permission" "api_gateway_github_webhook" {
+  statement_id  = "AllowAPIGatewayInvoke"
+  action        = "lambda:InvokeFunction"
+  function_name = module.github_webhook_lambda.function_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${aws_api_gateway_rest_api.main.execution_arn}/*/*"
+}
+
+# OPTIONS /github-webhook for CORS
+resource "aws_api_gateway_method" "github_webhook_options" {
+  rest_api_id   = aws_api_gateway_rest_api.main.id
+  resource_id   = aws_api_gateway_resource.github_webhook.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
+resource "aws_api_gateway_integration" "github_webhook_options" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.github_webhook.id
+  http_method = aws_api_gateway_method.github_webhook_options.http_method
+  type        = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\": 200}"
+  }
+}
+
+resource "aws_api_gateway_method_response" "github_webhook_options" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.github_webhook.id
+  http_method = aws_api_gateway_method.github_webhook_options.http_method
+  status_code = "200"
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = true
+    "method.response.header.Access-Control-Allow-Methods" = true
+    "method.response.header.Access-Control-Allow-Origin"  = true
+  }
+
+  response_models = {
+    "application/json" = "Empty"
+  }
+}
+
+resource "aws_api_gateway_integration_response" "github_webhook_options" {
+  rest_api_id = aws_api_gateway_rest_api.main.id
+  resource_id = aws_api_gateway_resource.github_webhook.id
+  http_method = aws_api_gateway_method.github_webhook_options.http_method
+  status_code = aws_api_gateway_method_response.github_webhook_options.status_code
+
+  response_parameters = {
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Hub-Signature-256'"
+    "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "method.response.header.Access-Control-Allow-Origin"  = "'*'"
+  }
+}
+
 # API Gateway Deployment
 resource "aws_api_gateway_deployment" "main" {
   rest_api_id = aws_api_gateway_rest_api.main.id
@@ -168,12 +250,15 @@ resource "aws_api_gateway_deployment" "main" {
     redeployment = sha1(jsonencode([
       aws_api_gateway_resource.deployments.id,
       aws_api_gateway_resource.deployment.id,
+      aws_api_gateway_resource.github_webhook.id,
       aws_api_gateway_method.create_deployment.id,
       aws_api_gateway_method.get_deployments.id,
       aws_api_gateway_method.get_deployment.id,
+      aws_api_gateway_method.github_webhook.id,
       aws_api_gateway_integration.create_deployment.id,
       aws_api_gateway_integration.get_deployments.id,
       aws_api_gateway_integration.get_deployment.id,
+      aws_api_gateway_integration.github_webhook.id,
     ]))
   }
 

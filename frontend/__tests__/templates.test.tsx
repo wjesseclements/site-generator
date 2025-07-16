@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+// Template configuration tests don't require rendering
 import { templates } from '@/lib/templates'
 
 describe('Templates Configuration', () => {

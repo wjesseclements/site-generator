@@ -146,63 +146,177 @@ export function TemplateModal({ template, isOpen, onClose, onDeploy }: TemplateM
         }}>
           {/* Header */}
           <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'space-between',
             padding: '1.5rem',
             borderBottom: '1px solid rgba(75, 85, 99, 0.3)'
           }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-              <div style={{
-                width: '48px',
-                height: '48px',
-                background: 'rgba(59, 130, 246, 0.1)',
-                borderRadius: '12px',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                fontSize: '24px',
-                border: '1px solid rgba(59, 130, 246, 0.2)'
-              }}>
-                {template.icon}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+                <div style={{
+                  width: '48px',
+                  height: '48px',
+                  background: 'rgba(59, 130, 246, 0.1)',
+                  borderRadius: '12px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '24px',
+                  border: '1px solid rgba(59, 130, 246, 0.2)'
+                }}>
+                  {template.icon}
+                </div>
+                <div>
+                  <h2 style={{ fontSize: '1.5rem', fontWeight: '600', color: '#fff', margin: 0 }}>
+                    {template.name}
+                  </h2>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginTop: '0.25rem' }}>
+                    <span style={{
+                      fontSize: '0.75rem',
+                      color: '#60A5FA',
+                      background: 'rgba(59, 130, 246, 0.1)',
+                      padding: '0.125rem 0.5rem',
+                      borderRadius: '4px',
+                      border: '1px solid rgba(59, 130, 246, 0.2)'
+                    }}>
+                      {template.category}
+                    </span>
+                    <span style={{ color: '#10B981', fontSize: '0.875rem', fontWeight: '600' }}>
+                      {template.estimatedCost}
+                    </span>
+                  </div>
+                </div>
               </div>
+              <button
+                onClick={onClose}
+                style={{
+                  background: 'transparent',
+                  border: 'none',
+                  color: '#6B7280',
+                  fontSize: '1.5rem',
+                  cursor: 'pointer',
+                  padding: '0.5rem',
+                  borderRadius: '8px',
+                  transition: 'all 0.2s ease'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = 'rgba(75, 85, 99, 0.2)'
+                  e.currentTarget.style.color = '#fff'
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = 'transparent'
+                  e.currentTarget.style.color = '#6B7280'
+                }}
+              >
+                ×
+              </button>
+            </div>
+            
+            <p style={{ fontSize: '0.875rem', color: '#D1D5DB', marginBottom: '1.5rem', lineHeight: '1.6' }}>
+              {template.description}
+            </p>
+            
+            {/* Template Details */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '1.5rem' }}>
+              {/* Features */}
               <div>
-                <h2 style={{ fontSize: '1.25rem', fontWeight: '600', color: '#fff', margin: 0 }}>
-                  {template.name}
-                </h2>
-                <p style={{ fontSize: '0.875rem', color: '#9CA3AF', margin: 0 }}>
-                  {template.description}
-                </p>
+                <h3 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#F3F4F6', marginBottom: '0.75rem' }}>
+                  Key Features
+                </h3>
+                <ul style={{ listStyle: 'none', padding: 0, margin: 0 }}>
+                  {template.features.slice(0, 4).map((feature, idx) => (
+                    <li key={idx} style={{
+                      fontSize: '0.75rem',
+                      color: '#9CA3AF',
+                      marginBottom: '0.5rem',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem'
+                    }}>
+                      <span style={{
+                        width: '4px',
+                        height: '4px',
+                        backgroundColor: '#60A5FA',
+                        borderRadius: '50%',
+                        flexShrink: 0
+                      }} />
+                      {feature}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+              
+              {/* Tech Stack */}
+              <div>
+                <h3 style={{ fontSize: '0.875rem', fontWeight: '600', color: '#F3F4F6', marginBottom: '0.75rem' }}>
+                  Tech Stack
+                </h3>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.5rem' }}>
+                  {template.techStack.map((tech, idx) => (
+                    <span key={idx} style={{
+                      fontSize: '0.75rem',
+                      color: '#E5E7EB',
+                      background: 'rgba(55, 65, 81, 0.5)',
+                      padding: '0.25rem 0.5rem',
+                      borderRadius: '4px',
+                      border: '1px solid rgba(75, 85, 99, 0.3)'
+                    }}>
+                      {tech}
+                    </span>
+                  ))}
+                </div>
               </div>
             </div>
-            <button
-              onClick={onClose}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                color: '#6B7280',
-                fontSize: '1.5rem',
-                cursor: 'pointer',
-                padding: '0.5rem',
-                borderRadius: '8px',
-                transition: 'all 0.2s ease'
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = 'rgba(75, 85, 99, 0.2)'
-                e.currentTarget.style.color = '#fff'
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = 'transparent'
-                e.currentTarget.style.color = '#6B7280'
-              }}
-            >
-              ×
-            </button>
           </div>
           
           {/* Form */}
           <form onSubmit={handleSubmit} style={{ padding: '1.5rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1.5rem' }}>
+              {/* Required Tag Field */}
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: '0.875rem',
+                  fontWeight: '500',
+                  color: '#D1D5DB',
+                  marginBottom: '0.5rem'
+                }}>
+                  Test Tag
+                  <span style={{ color: '#EF4444', marginLeft: '0.25rem' }}>*</span>
+                </label>
+                <input
+                  type="text"
+                  value={values.testTag ?? ''}
+                  onChange={(e) => setValues({ ...values, testTag: e.target.value })}
+                  placeholder="Enter a tag to identify this test deployment (e.g., test-2025-01-15)"
+                  required
+                  style={{
+                    width: '100%',
+                    padding: '0.75rem',
+                    background: 'rgba(31, 41, 55, 0.5)',
+                    border: '1px solid rgba(75, 85, 99, 0.5)',
+                    borderRadius: '8px',
+                    color: '#fff',
+                    fontSize: '0.875rem',
+                    outline: 'none',
+                    transition: 'all 0.2s ease'
+                  }}
+                  onFocus={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(96, 165, 250, 0.5)'
+                    e.currentTarget.style.background = 'rgba(31, 41, 55, 0.8)'
+                  }}
+                  onBlur={(e) => {
+                    e.currentTarget.style.borderColor = 'rgba(75, 85, 99, 0.5)'
+                    e.currentTarget.style.background = 'rgba(31, 41, 55, 0.5)'
+                  }}
+                />
+                <p style={{
+                  marginTop: '0.25rem',
+                  fontSize: '0.75rem',
+                  color: '#6B7280'
+                }}>
+                  This tag will be applied to all AWS resources for easy identification and cleanup
+                </p>
+              </div>
+
               {template.parameters.map((param) => (
                 <div key={param.name}>
                   <label style={{

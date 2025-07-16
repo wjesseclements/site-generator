@@ -1,0 +1,139 @@
+# GitHub Actions Workflow for Infrastructure Deployment
+# This workflow should be placed in the external infrastructure repository
+# Path: .github/workflows/deploy-infrastructure.yml
+
+name: Deploy Infrastructure
+
+on:
+  repository_dispatch:
+    types: [infrastructure-deployment]
+
+env:
+  AWS_REGION: us-east-1
+  TF_VERSION: "1.5.7"
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    steps:
+      - name: Checkout Infrastructure Templates
+        uses: actions/checkout@v4
+        
+      - name: Configure AWS Credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ env.AWS_REGION }}
+          role-session-name: GitHubActions-${{ github.run_id }}
+          
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: ${{ env.TF_VERSION }}
+          
+      - name: Extract Deployment Parameters
+        id: params
+        run: |
+          echo "deployment_id=${{ github.event.client_payload.deployment_id }}" >> $GITHUB_OUTPUT
+          echo "template_id=${{ github.event.client_payload.template_id }}" >> $GITHUB_OUTPUT
+          echo "action=${{ github.event.client_payload.action }}" >> $GITHUB_OUTPUT
+          echo "site_name=${{ github.event.client_payload.site_name }}" >> $GITHUB_OUTPUT
+          echo "target_account=${{ github.event.client_payload.target_account }}" >> $GITHUB_OUTPUT
+          echo "environment=${{ github.event.client_payload.environment }}" >> $GITHUB_OUTPUT
+          echo "webhook_url=${{ github.event.client_payload.webhook_url }}" >> $GITHUB_OUTPUT
+          
+      - name: Send Initial Status
+        run: |
+          curl -X POST "${{ steps.params.outputs.webhook_url }}" \
+            -H "Content-Type: application/json" \
+            -H "X-Hub-Signature-256: sha256=$(echo -n '{"deployment_id":"${{ steps.params.outputs.deployment_id }}","status":"PLANNING","message":"GitHub Actions workflow started","step":"initialization"}' | openssl dgst -sha256 -hmac '${{ secrets.WEBHOOK_SECRET }}' -binary | xxd -p)" \
+            -d '{"deployment_id":"${{ steps.params.outputs.deployment_id }}","status":"PLANNING","message":"GitHub Actions workflow started","step":"initialization"}'
+            
+      - name: Create Terraform Variables
+        run: |
+          cd templates/${{ steps.params.outputs.template_id }}
+          
+          # Create terraform.tfvars from deployment parameters
+          cat > terraform.tfvars << EOF
+          deployment_id = "${{ steps.params.outputs.deployment_id }}"
+          site_name = "${{ steps.params.outputs.site_name }}"
+          environment = "${{ steps.params.outputs.environment }}"
+          
+          # Template-specific parameters
+          $(echo '${{ github.event.client_payload.parameters }}' | jq -r 'to_entries[] | "\(.key) = \(.value | if type == "string" then "\"\(.)\"" else . end)"')
+          
+          # Tags
+          tags = {
+            DeploymentId = "${{ steps.params.outputs.deployment_id }}"
+            Template = "${{ steps.params.outputs.template_id }}"
+            CreatedBy = "${{ github.event.client_payload.created_by || github.event.client_payload.user_id }}"
+            CreatedDate = "${{ github.event.client_payload.created_at }}"
+            Environment = "${{ steps.params.outputs.environment }}"
+          }
+          EOF
+          
+      - name: Create Backend Configuration
+        run: |
+          cd templates/${{ steps.params.outputs.template_id }}
+          
+          # Create backend.tfvars
+          cat > backend.tfvars << EOF
+          bucket = "${{ secrets.TERRAFORM_STATE_BUCKET }}"
+          key = "deployments/${{ steps.params.outputs.deployment_id }}/terraform.tfstate"
+          region = "${{ env.AWS_REGION }}"
+          dynamodb_table = "${{ secrets.TERRAFORM_LOCKS_TABLE }}"
+          encrypt = true
+          EOF
+          
+      - name: Terraform Init
+        run: |
+          cd templates/${{ steps.params.outputs.template_id }}
+          terraform init -backend-config=backend.tfvars
+          
+      - name: Send Planning Status
+        run: |
+          curl -X POST "${{ steps.params.outputs.webhook_url }}" \
+            -H "Content-Type: application/json" \
+            -H "X-Hub-Signature-256: sha256=$(echo -n '{"deployment_id":"${{ steps.params.outputs.deployment_id }}","status":"PLANNING","message":"Running terraform plan","step":"planning"}' | openssl dgst -sha256 -hmac '${{ secrets.WEBHOOK_SECRET }}' -binary | xxd -p)" \
+            -d '{"deployment_id":"${{ steps.params.outputs.deployment_id }}","status":"PLANNING","message":"Running terraform plan","step":"planning"}'
+            
+      - name: Terraform Plan
+        run: |
+          cd templates/${{ steps.params.outputs.template_id }}
+          terraform plan -var-file=terraform.tfvars -out=tfplan
+          
+      - name: Send Deploying Status
+        run: |
+          curl -X POST "${{ steps.params.outputs.webhook_url }}" \
+            -H "Content-Type: application/json" \
+            -H "X-Hub-Signature-256: sha256=$(echo -n '{"deployment_id":"${{ steps.params.outputs.deployment_id }}","status":"DEPLOYING","message":"Running terraform apply","step":"deploying"}' | openssl dgst -sha256 -hmac '${{ secrets.WEBHOOK_SECRET }}' -binary | xxd -p)" \
+            -d '{"deployment_id":"${{ steps.params.outputs.deployment_id }}","status":"DEPLOYING","message":"Running terraform apply","step":"deploying"}'
+            
+      - name: Terraform Apply
+        run: |
+          cd templates/${{ steps.params.outputs.template_id }}
+          terraform apply -auto-approve tfplan
+          
+      - name: Get Terraform Outputs
+        id: outputs
+        run: |
+          cd templates/${{ steps.params.outputs.template_id }}
+          terraform output -json > outputs.json
+          echo "terraform_outputs=$(cat outputs.json)" >> $GITHUB_OUTPUT
+          
+      - name: Send Success Status
+        run: |
+          curl -X POST "${{ steps.params.outputs.webhook_url }}" \
+            -H "Content-Type: application/json" \
+            -H "X-Hub-Signature-256: sha256=$(echo -n '{"deployment_id":"${{ steps.params.outputs.deployment_id }}","status":"COMPLETED","message":"Deployment completed successfully","step":"completed","outputs":${{ steps.outputs.terraform_outputs }}}' | openssl dgst -sha256 -hmac '${{ secrets.WEBHOOK_SECRET }}' -binary | xxd -p)" \
+            -d '{"deployment_id":"${{ steps.params.outputs.deployment_id }}","status":"COMPLETED","message":"Deployment completed successfully","step":"completed","outputs":${{ steps.outputs.terraform_outputs }}}'
+            
+      - name: Send Failure Status
+        if: failure()
+        run: |
+          curl -X POST "${{ steps.params.outputs.webhook_url }}" \
+            -H "Content-Type: application/json" \
+            -H "X-Hub-Signature-256: sha256=$(echo -n '{"deployment_id":"${{ steps.params.outputs.deployment_id }}","status":"FAILED","message":"Deployment failed","step":"failed","error":"GitHub Actions workflow failed"}' | openssl dgst -sha256 -hmac '${{ secrets.WEBHOOK_SECRET }}' -binary | xxd -p)" \
+            -d '{"deployment_id":"${{ steps.params.outputs.deployment_id }}","status":"FAILED","message":"Deployment failed","step":"failed","error":"GitHub Actions workflow failed"}'

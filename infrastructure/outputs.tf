@@ -1,6 +1,6 @@
 output "frontend_url" {
-  description = "URL of the frontend S3 website"
-  value       = "http://${aws_s3_bucket_website_configuration.frontend.website_endpoint}"
+  description = "URL of the frontend CloudFront distribution"
+  value       = "https://${aws_cloudfront_distribution.frontend.domain_name}"
 }
 
 output "api_gateway_url" {
@@ -60,11 +60,11 @@ output "step_functions_arn" {
 
 output "deployment_instructions" {
   description = "Instructions for deploying the frontend"
-  value = <<-EOT
+  value       = <<-EOT
     To deploy the frontend:
     1. Build the Next.js app: cd ../frontend && npm run build
     2. Upload to S3: aws s3 sync out/ s3://${aws_s3_bucket.frontend.id}/ --delete
-    3. Access the site at: ${aws_s3_bucket_website_configuration.frontend.website_endpoint}
+    3. Access the site at: https://${aws_cloudfront_distribution.frontend.domain_name}
     
     To configure the frontend:
     1. Update frontend/.env.local with:

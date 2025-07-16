@@ -46,6 +46,29 @@ variable "lambda_timeout" {
   default     = 300
 }
 
+# AWS Best Practice: Artifact versioning for S3-based deployments
+variable "lambda_artifact_version" {
+  description = "Version of Lambda artifacts to deploy"
+  type        = string
+  default     = "latest"
+}
+
+variable "enable_lambda_tracing" {
+  description = "Enable X-Ray tracing for Lambda functions"
+  type        = bool
+  default     = true
+}
+
+variable "lambda_log_level" {
+  description = "Log level for Lambda functions"
+  type        = string
+  default     = "INFO"
+  validation {
+    condition     = contains(["TRACE", "DEBUG", "INFO", "WARN", "ERROR", "FATAL"], var.lambda_log_level)
+    error_message = "Log level must be one of: TRACE, DEBUG, INFO, WARN, ERROR, FATAL."
+  }
+}
+
 variable "dynamodb_billing_mode" {
   description = "DynamoDB billing mode (PAY_PER_REQUEST or PROVISIONED)"
   type        = string
@@ -82,6 +105,45 @@ variable "cross_account_external_id" {
   default     = "site-generator-deployment"
 }
 
+variable "github_token" {
+  description = "GitHub personal access token for repository dispatch"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "github_repo_owner" {
+  description = "GitHub repository owner/organization"
+  type        = string
+  default     = "wjesseclements"
+}
+
+variable "github_repo_name" {
+  description = "GitHub repository name for infrastructure templates"
+  type        = string
+  default     = "site-generator-infrastructure"
+}
+
+variable "github_webhook_secret" {
+  description = "Secret for GitHub webhook verification"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+# AWS Best Practice: Lambda code signing variables
+variable "enable_code_signing" {
+  description = "Enable Lambda code signing for enhanced security"
+  type        = bool
+  default     = false
+}
+
+variable "code_signing_profile_arns" {
+  description = "List of AWS Signer signing profile ARNs for Lambda code signing"
+  type        = list(string)
+  default     = []
+}
+
 locals {
   common_tags = merge(
     {
@@ -92,6 +154,6 @@ locals {
     },
     var.tags
   )
-  
+
   resource_prefix = "${var.project_name}-${var.environment}"
 }

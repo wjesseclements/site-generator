@@ -1,0 +1,90 @@
+{
+  "api_gateway_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "https://yiz8smdafc.execute-api.us-east-1.amazonaws.com/dev"
+  },
+  "cognito_hosted_ui_domain": {
+    "sensitive": false,
+    "type": "string",
+    "value": "https://site-generator-dev-050752625591.auth.us-east-1.amazoncognito.com"
+  },
+  "cognito_identity_pool_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "us-east-1:0a364d34-92b5-4300-b76e-73664e348a19"
+  },
+  "cognito_user_pool_client_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "5up9dch261n70qddpkh0rou7lp"
+  },
+  "cognito_user_pool_id": {
+    "sensitive": false,
+    "type": "string",
+    "value": "us-east-1_1Fu7LU09W"
+  },
+  "connections_table_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "site-generator-dev-connections"
+  },
+  "cross_account_role_template": {
+    "sensitive": false,
+    "type": [
+      "object",
+      {
+        "external_id_required": "string",
+        "policy_attachment_needed": "string",
+        "role_name": "string",
+        "trusted_principal_arn": "string"
+      }
+    ],
+    "value": {
+      "external_id_required": "site-generator-deployment",
+      "policy_attachment_needed": "PowerUserAccess or custom policy",
+      "role_name": "site-generator-dev-deploy-role",
+      "trusted_principal_arn": "arn:aws:iam::050752625591:role/site-generator-dev-terraform-runner-execution"
+    }
+  },
+  "deployment_instructions": {
+    "sensitive": false,
+    "type": "string",
+    "value": "To deploy the frontend:\n1. Build the Next.js app: cd ../frontend \u0026\u0026 npm run build\n2. Upload to S3: aws s3 sync out/ s3://site-generator-dev-frontend/ --delete\n3. Access the site at: site-generator-dev-frontend.s3-website-us-east-1.amazonaws.com\n    \nTo configure the frontend:\n1. Update frontend/.env.local with:\n   NEXT_PUBLIC_API_URL=https://yiz8smdafc.execute-api.us-east-1.amazonaws.com/dev\n   NEXT_PUBLIC_WEBSOCKET_URL=wss://zcj3sqcy3d.execute-api.us-east-1.amazonaws.com/dev\n   NEXT_PUBLIC_USER_POOL_ID=us-east-1_1Fu7LU09W\n   NEXT_PUBLIC_USER_POOL_CLIENT_ID=5up9dch261n70qddpkh0rou7lp\n   NEXT_PUBLIC_IDENTITY_POOL_ID=us-east-1:0a364d34-92b5-4300-b76e-73664e348a19\n   NEXT_PUBLIC_REGION=us-east-1\n"
+  },
+  "deployment_table_name": {
+    "sensitive": false,
+    "type": "string",
+    "value": "site-generator-dev-deployments"
+  },
+  "frontend_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "http://site-generator-dev-frontend.s3-website-us-east-1.amazonaws.com"
+  },
+  "github_actions_role_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:iam::050752625591:role/site-generator-dev-github-actions-deploy"
+  },
+  "lambda_deployment_bucket": {
+    "sensitive": false,
+    "type": "string",
+    "value": "site-generator-dev-lambda-deployments"
+  },
+  "step_functions_arn": {
+    "sensitive": false,
+    "type": "string",
+    "value": "arn:aws:states:us-east-1:050752625591:stateMachine:site-generator-dev-deployment-orchestrator"
+  },
+  "terraform_state_bucket": {
+    "sensitive": false,
+    "type": "string",
+    "value": "site-generator-dev-terraform-states"
+  },
+  "websocket_url": {
+    "sensitive": false,
+    "type": "string",
+    "value": "wss://zcj3sqcy3d.execute-api.us-east-1.amazonaws.com/dev"
+  }
+}

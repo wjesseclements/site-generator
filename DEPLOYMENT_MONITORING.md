@@ -125,26 +125,25 @@ interface DeploymentDetails {
 ```typescript
 // GET /deployments
 export const handler: APIGatewayProxyHandler = async (event) => {
-  const userId = getUserIdFromEvent(event)
-  const status = event.queryStringParameters?.status
+  const userId = event.requestContext.authorizer?.claims?.sub || 'test-user'
   
-  const params: AWS.DynamoDB.DocumentClient.QueryInput = {
-    TableName: process.env.DEPLOYMENTS_TABLE!,
-    IndexName: 'UserIdIndex',
+  const result = await dynamodb.query({
+    TableName: DEPLOYMENTS_TABLE,
+    IndexName: 'UserIdIndex', 
     KeyConditionExpression: 'userId = :userId',
-    ExpressionAttributeValues: { ':userId': userId }
-  }
-  
-  if (status && status !== 'ALL') {
-    params.FilterExpression = '#status = :status'
-    params.ExpressionAttributeNames = { '#status': 'status' }
-    params.ExpressionAttributeValues![':status'] = status
-  }
-  
-  const result = await dynamodb.query(params).promise()
+    ExpressionAttributeValues: { ':userId': userId },
+    ScanIndexForward: false // Most recent first
+  }).promise()
+
   return {
     statusCode: 200,
-    body: JSON.stringify(result.Items)
+    headers: {
+      'Content-Type': 'application/json',
+      'Access-Control-Allow-Origin': '*'
+    },
+    body: JSON.stringify({
+      deployments: result.Items || []
+    })
   }
 }
 ```

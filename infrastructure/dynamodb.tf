@@ -1,8 +1,8 @@
 # DynamoDB table for deployment tracking
 resource "aws_dynamodb_table" "deployments" {
-  name           = "${local.resource_prefix}-deployments"
-  billing_mode   = var.dynamodb_billing_mode
-  hash_key       = "id"
+  name         = "${local.resource_prefix}-deployments"
+  billing_mode = var.dynamodb_billing_mode
+  hash_key     = "id"
 
   attribute {
     name = "id"
@@ -64,9 +64,9 @@ resource "aws_dynamodb_table" "deployments" {
 
 # DynamoDB table for WebSocket connections
 resource "aws_dynamodb_table" "connections" {
-  name           = "${local.resource_prefix}-connections"
-  billing_mode   = var.dynamodb_billing_mode
-  hash_key       = "connectionId"
+  name         = "${local.resource_prefix}-connections"
+  billing_mode = var.dynamodb_billing_mode
+  hash_key     = "connectionId"
 
   attribute {
     name = "connectionId"
@@ -118,9 +118,9 @@ resource "aws_dynamodb_table" "connections" {
 
 # DynamoDB table for Step Functions execution locks
 resource "aws_dynamodb_table" "terraform_locks" {
-  name           = "${local.resource_prefix}-terraform-locks"
-  billing_mode   = "PAY_PER_REQUEST"
-  hash_key       = "LockID"
+  name         = "${local.resource_prefix}-terraform-locks"
+  billing_mode = "PAY_PER_REQUEST"
+  hash_key     = "LockID"
 
   attribute {
     name = "LockID"

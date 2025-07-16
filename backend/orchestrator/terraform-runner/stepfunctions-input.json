@@ -1,0 +1,25 @@
+{
+  "id": "test-terraform-runner-2025",
+  "userId": "1438e408-6041-70dd-f462-a1f49d744ca2",
+  "templateId": "data-explorer",
+  "templateName": "Data Explorer",
+  "siteName": "test-terraform-runner-site",
+  "parameters": {
+    "siteName": "test-terraform-runner-site",
+    "siteDescription": "Test deployment for Terraform runner validation",
+    "adminEmail": "test@example.com",
+    "enableTimestampSorting": true,
+    "enableCategoryIndex": true,
+    "maxQueryResults": 100
+  },
+  "status": "PENDING",
+  "createdAt": "2025-07-07T20:40:00.000Z",
+  "updatedAt": "2025-07-07T20:40:00.000Z",
+  "tags": {
+    "Project": "test-terraform-runner-site",
+    "Template": "data-explorer",
+    "Owner": "1438e408-6041-70dd-f462-a1f49d744ca2",
+    "CreatedBy": "site-generator",
+    "CreatedDate": "2025-07-07"
+  }
+}

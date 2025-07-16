@@ -8,7 +8,7 @@ resource "aws_sfn_state_machine" "deployment_orchestrator" {
     StartAt = "UpdateDeploymentStatus"
     States = {
       UpdateDeploymentStatus = {
-        Type = "Task"
+        Type     = "Task"
         Resource = "arn:aws:states:::dynamodb:updateItem"
         Parameters = {
           TableName = aws_dynamodb_table.deployments.name
@@ -19,7 +19,7 @@ resource "aws_sfn_state_machine" "deployment_orchestrator" {
           }
           UpdateExpression = "SET #status = :status, #updatedAt = :updatedAt"
           ExpressionAttributeNames = {
-            "#status" = "status"
+            "#status"    = "status"
             "#updatedAt" = "updatedAt"
           }
           ExpressionAttributeValues = {
@@ -31,84 +31,79 @@ resource "aws_sfn_state_machine" "deployment_orchestrator" {
             }
           }
         }
-        Next = "InitializeTerraform"
+        Next       = "TriggerGitHubActions"
         ResultPath = "$.updateResult"
       }
 
-      InitializeTerraform = {
-        Type = "Task"
-        Resource = module.terraform_runner_lambda.function_arn
+      TriggerGitHubActions = {
+        Type     = "Task"
+        Resource = "arn:aws:states:::lambda:invoke.waitForTaskToken"
         Parameters = {
-          "deployment.$" = "$"
-          "action" = "init"
+          FunctionName = module.github_dispatch_lambda.function_name
+          Payload = {
+            "TaskToken.$"  = "$$.Task.Token"
+            "deployment.$" = "$"
+            "action"       = "deploy"
+          }
         }
-        Next = "PlanTerraform"
+        TimeoutSeconds = 3600
+        Next           = "MarkDeploymentCompleted"
+        ResultPath     = "$.githubResult"
         Retry = [
           {
-            ErrorEquals = ["States.TaskFailed"]
-            IntervalSeconds = 2
-            MaxAttempts = 3
-            BackoffRate = 2
+            ErrorEquals     = ["States.TaskFailed"]
+            IntervalSeconds = 5
+            MaxAttempts     = 3
+            BackoffRate     = 2
           }
         ]
         Catch = [
           {
+            ErrorEquals = ["States.Timeout"]
+            Next        = "HandleTimeout"
+            ResultPath  = "$.error"
+          },
+          {
             ErrorEquals = ["States.ALL"]
-            Next = "MarkDeploymentFailed"
+            Next        = "MarkDeploymentFailed"
+            ResultPath  = "$.error"
           }
         ]
       }
 
-      PlanTerraform = {
-        Type = "Task"
-        Resource = module.terraform_runner_lambda.function_arn
+      HandleTimeout = {
+        Type     = "Task"
+        Resource = "arn:aws:states:::dynamodb:updateItem"
         Parameters = {
-          "deployment.$" = "$"
-          "action" = "plan"
+          TableName = aws_dynamodb_table.deployments.name
+          Key = {
+            id = {
+              "S.$" = "$.id"
+            }
+          }
+          UpdateExpression = "SET #status = :status, #updatedAt = :updatedAt, #error = :error"
+          ExpressionAttributeNames = {
+            "#status"    = "status"
+            "#updatedAt" = "updatedAt"
+            "#error"     = "error"
+          }
+          ExpressionAttributeValues = {
+            ":status" = {
+              S = "FAILED"
+            }
+            ":updatedAt" = {
+              "S.$" = "$$.State.EnteredTime"
+            }
+            ":error" = {
+              S = "Deployment timed out after 1 hour"
+            }
+          }
         }
-        Next = "ApplyTerraform"
-        Retry = [
-          {
-            ErrorEquals = ["States.TaskFailed"]
-            IntervalSeconds = 2
-            MaxAttempts = 3
-            BackoffRate = 2
-          }
-        ]
-        Catch = [
-          {
-            ErrorEquals = ["States.ALL"]
-            Next = "MarkDeploymentFailed"
-          }
-        ]
-      }
-
-      ApplyTerraform = {
-        Type = "Task"
-        Resource = module.terraform_runner_lambda.function_arn
-        Parameters = {
-          "deployment.$" = "$"
-          "action" = "apply"
-        }
-        Next = "MarkDeploymentCompleted"
-        Retry = [
-          {
-            ErrorEquals = ["States.TaskFailed"]
-            IntervalSeconds = 2
-            MaxAttempts = 3
-            BackoffRate = 2
-          }
-        ]
-        Catch = [
-          {
-            ErrorEquals = ["States.ALL"]
-            Next = "MarkDeploymentFailed"
-          }
-        ]
+        End = true
       }
 
       MarkDeploymentCompleted = {
-        Type = "Task"
+        Type     = "Task"
         Resource = "arn:aws:states:::dynamodb:updateItem"
         Parameters = {
           TableName = aws_dynamodb_table.deployments.name
@@ -119,8 +114,8 @@ resource "aws_sfn_state_machine" "deployment_orchestrator" {
           }
           UpdateExpression = "SET #status = :status, #updatedAt = :updatedAt, #completedAt = :completedAt"
           ExpressionAttributeNames = {
-            "#status" = "status"
-            "#updatedAt" = "updatedAt"
+            "#status"      = "status"
+            "#updatedAt"   = "updatedAt"
             "#completedAt" = "completedAt"
           }
           ExpressionAttributeValues = {
@@ -139,7 +134,7 @@ resource "aws_sfn_state_machine" "deployment_orchestrator" {
       }
 
       MarkDeploymentFailed = {
-        Type = "Task"
+        Type     = "Task"
         Resource = "arn:aws:states:::dynamodb:updateItem"
         Parameters = {
           TableName = aws_dynamodb_table.deployments.name
@@ -150,9 +145,9 @@ resource "aws_sfn_state_machine" "deployment_orchestrator" {
           }
           UpdateExpression = "SET #status = :status, #updatedAt = :updatedAt, #error = :error"
           ExpressionAttributeNames = {
-            "#status" = "status"
+            "#status"    = "status"
             "#updatedAt" = "updatedAt"
-            "#error" = "error"
+            "#error"     = "error"
           }
           ExpressionAttributeValues = {
             ":status" = {
@@ -171,11 +166,11 @@ resource "aws_sfn_state_machine" "deployment_orchestrator" {
     }
   })
 
-  logging_configuration {
-    log_destination        = "${aws_cloudwatch_log_group.step_functions.arn}:*"
-    include_execution_data = true
-    level                  = "ERROR"
-  }
+  # logging_configuration {
+  #   log_destination        = "${aws_cloudwatch_log_group.step_functions.arn}:*"
+  #   include_execution_data = true
+  #   level                  = "ALL"
+  # }
 
   tags = local.common_tags
 }

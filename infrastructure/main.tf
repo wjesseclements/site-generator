@@ -6,16 +6,16 @@ provider "aws" {
   }
 }
 
-# S3 bucket for Terraform state (optional - for production use)
-# terraform {
-#   backend "s3" {
-#     bucket         = "site-generator-terraform-state"
-#     key            = "platform/terraform.tfstate"
-#     region         = "us-east-1"
-#     dynamodb_table = "site-generator-terraform-locks"
-#     encrypt        = true
-#   }
-# }
+# S3 bucket for Terraform state (separate keys for local vs GitHub Actions)
+terraform {
+  backend "s3" {
+    bucket         = "site-generator-dev-terraform-states"
+    key            = "local/terraform.tfstate"
+    region         = "us-east-1"
+    dynamodb_table = "site-generator-dev-terraform-locks"
+    encrypt        = true
+  }
+}
 
 # Get current AWS account ID
 data "aws_caller_identity" "current" {}

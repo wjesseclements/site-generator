@@ -34,59 +34,54 @@ describe('WebSocket Manager', () => {
   let manager: WebSocketManager
 
   beforeEach(() => {
-    manager = new WebSocketManager()
+    manager = new WebSocketManager('wss://test.com')
   })
 
   afterEach(() => {
     manager.disconnect()
   })
 
-  test('should create WebSocket connection', () => {
-    const url = 'wss://test.com'
-    const deploymentId = 'test-deployment'
-    
-    manager.connect(url, deploymentId)
-    
+  test('should create WebSocket connection', async () => {
+    await manager.connect()
     expect(manager['ws']).toBeDefined()
-    expect(manager['ws']?.url).toBe(`${url}?deploymentId=${deploymentId}`)
+    expect(manager['ws']?.url).toBe('wss://test.com')
   })
 
-  test('should add and notify listeners', async () => {
+  test('should subscribe to deployments', async () => {
     const listener = jest.fn()
     const deploymentId = 'test-deployment'
     
-    manager.addListener(deploymentId, listener)
-    manager.connect('wss://test.com', deploymentId)
+    await manager.connect()
+    manager.subscribeToDeployment(deploymentId, listener)
     
     // Wait for connection
     await new Promise(resolve => setTimeout(resolve, 20))
     
     // Simulate message
     const testUpdate = {
-      type: 'deployment_status',
       deploymentId,
-      status: 'PENDING',
-      message: 'Test message',
-      timestamp: new Date().toISOString()
+      status: 'DEPLOYING' as const,
+      message: 'Test message'
     }
     
-    manager['notifyListeners'](testUpdate)
+    manager['handleMessage'](testUpdate)
     expect(listener).toHaveBeenCalledWith(testUpdate)
   })
 
-  test('should remove listeners', () => {
+  test('should unsubscribe from deployments', async () => {
     const deploymentId = 'test-deployment'
     const listener = jest.fn()
     
-    manager.addListener(deploymentId, listener)
+    await manager.connect()
+    manager.subscribeToDeployment(deploymentId, listener)
     expect(manager['listeners'].has(deploymentId)).toBe(true)
     
-    manager.removeListener(deploymentId)
+    manager.unsubscribeFromDeployment(deploymentId)
     expect(manager['listeners'].has(deploymentId)).toBe(false)
   })
 
-  test('should handle disconnection', () => {
-    manager.connect('wss://test.com', 'test-deployment')
+  test('should handle disconnection', async () => {
+    await manager.connect()
     expect(manager['ws']).toBeDefined()
     
     manager.disconnect()

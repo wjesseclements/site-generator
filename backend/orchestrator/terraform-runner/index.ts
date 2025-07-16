@@ -12,6 +12,8 @@ const DEPLOYMENTS_TABLE = process.env.DEPLOYMENTS_TABLE!
 const CONNECTIONS_TABLE = process.env.CONNECTIONS_TABLE!
 const TERRAFORM_BUCKET = process.env.TERRAFORM_BUCKET!
 const CROSS_ACCOUNT_ROLE_PREFIX = process.env.CROSS_ACCOUNT_ROLE_PREFIX!
+const TERRAFORM_WORK_DIR = process.env.TERRAFORM_WORK_DIR || '/tmp'
+const TEMPLATE_SOURCE_DIR = process.env.TEMPLATE_SOURCE_DIR || '../../../templates'
 
 interface TerraformRunnerEvent {
   deployment: Deployment
@@ -20,7 +22,25 @@ interface TerraformRunnerEvent {
 
 export const handler: Handler<TerraformRunnerEvent> = async (event) => {
   const { deployment, action } = event
-  const workDir = `/tmp/terraform-${deployment.id}`
+  
+  // Input validation
+  if (!deployment) {
+    throw new Error('Missing required parameter: deployment')
+  }
+  
+  if (!action || !['init', 'plan', 'apply', 'destroy'].includes(action)) {
+    throw new Error('Invalid action parameter: must be "init", "plan", "apply", or "destroy"')
+  }
+  
+  // Validate deployment object has required fields
+  const requiredFields = ['id', 'templateId', 'parameters']
+  for (const field of requiredFields) {
+    if (!deployment[field]) {
+      throw new Error(`Missing required deployment field: ${field}`)
+    }
+  }
+  
+  const workDir = `${TERRAFORM_WORK_DIR}/terraform-${deployment.id}`
   
   try {
     // Update deployment status
@@ -149,7 +169,7 @@ export const handler: Handler<TerraformRunnerEvent> = async (event) => {
 async function downloadTemplate(templateId: string, workDir: string) {
   // For now, copy from local templates directory
   // In production, this would download from S3
-  const templateDir = path.join(__dirname, `../../../templates/${templateId}`)
+  const templateDir = path.join(__dirname, `${TEMPLATE_SOURCE_DIR}/${templateId}`)
   
   // Copy all files from template to work directory
   const files = fs.readdirSync(templateDir)
